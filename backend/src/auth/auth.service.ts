@@ -218,7 +218,7 @@ export class AuthService {
       throw new UnauthorizedException('Tài khoản của bạn đã bị vô hiệu hóa.');
     }
 
-    const payload = { sub: user.email, role: user.role.name };
+    const payload = { sub: user.email, role: user.role.name, id: user.id };
     return {
       access_token: this.jwtService.sign(payload),
       user: { email: user.email, role: user.role.name },

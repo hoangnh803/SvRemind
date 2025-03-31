@@ -14,6 +14,7 @@ import { EmailTemplate } from './email-templates/entities/email-template.entity'
 import { Transaction } from './transactions/entities/transaction.entity';
 import { UsersModule } from './users/users.module';
 import { HttpModule } from '@nestjs/axios';
+import { EmailTemplateModule } from './email-templates/email-template.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { HttpModule } from '@nestjs/axios';
       entities: [User, Role, StudentCard, EmailTemplate, Transaction],
       synchronize: true, // Chỉ dùng trong development, tự tạo bảng
     }),
+    EmailTemplateModule,
     AuthModule,
     UsersModule,
     HttpModule,
