@@ -4,8 +4,33 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { Editor } from "@tinymce/tinymce-react";
+import {
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  getPaginationRowModel,
+  getFilteredRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { columns } from "./columns";
 
-// Định nghĩa interface cho Email Template
 interface EmailTemplate {
   id: string;
   name: string;
@@ -16,16 +41,10 @@ interface EmailTemplate {
 export default function EmailTemplatePage() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
-  const [currentTemplate, setCurrentTemplate] = useState<EmailTemplate | null>(
-    null
-  );
-  const [formData, setFormData] = useState({
-    name: "",
-    title: "",
-    body: "",
-  });
+  const [currentTemplate, setCurrentTemplate] = useState<EmailTemplate | null>(null);
+  const [formData, setFormData] = useState({ name: "", title: "", body: "" });
+  const [globalFilter, setGlobalFilter] = useState("");
 
-  // Lấy danh sách template từ API
   useEffect(() => {
     const fetchTemplates = async () => {
       try {
@@ -45,14 +64,12 @@ export default function EmailTemplatePage() {
     fetchTemplates();
   }, []);
 
-  // Mở pop-up để tạo template mới
   const handleCreateTemplate = () => {
     setCurrentTemplate(null);
     setFormData({ name: "", title: "", body: "" });
     setIsPopupOpen(true);
   };
 
-  // Mở pop-up để chỉnh sửa template
   const handleEditTemplate = (template: EmailTemplate) => {
     setCurrentTemplate(template);
     setFormData({
@@ -63,25 +80,20 @@ export default function EmailTemplatePage() {
     setIsPopupOpen(true);
   };
 
-  // Xử lý khi thay đổi giá trị trong form
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Xử lý khi thay đổi nội dung trong TinyMCE
   const handleEditorChange = (content: string) => {
     setFormData((prev) => ({ ...prev, body: content }));
   };
 
-  // Lưu template (tạo mới hoặc chỉnh sửa)
   const handleSaveTemplate = async () => {
     if (!formData.name || !formData.title || !formData.body) {
       alert("Vui lòng điền đầy đủ thông tin.");
       return;
     }
-    console.log("Dữ liệu gửi đi:", formData);
-
     try {
       if (currentTemplate) {
         const response = await axios.put(
@@ -114,18 +126,11 @@ export default function EmailTemplatePage() {
       }
       setIsPopupOpen(false);
     } catch (error: any) {
-      console.error(
-        "Lỗi khi lưu template:",
-        error.response?.data || error.message
-      );
-      const errorMessage =
-        error.response?.data?.message ||
-        "Không thể lưu template. Vui lòng thử lại.";
-      alert(errorMessage);
+      console.error("Lỗi khi lưu template:", error);
+      alert(error.response?.data?.message || "Không thể lưu template.");
     }
   };
 
-  // Xóa template
   const handleDeleteTemplate = async (id: string) => {
     if (confirm("Bạn có chắc chắn muốn xóa template này?")) {
       try {
@@ -137,99 +142,169 @@ export default function EmailTemplatePage() {
         setTemplates((prev) => prev.filter((template) => template.id !== id));
       } catch (error) {
         console.error("Lỗi khi xóa template:", error);
-        alert("Không thể xóa template. Vui lòng thử lại.");
+        alert("Không thể xóa template.");
       }
     }
   };
 
+  const table = useReactTable({
+    data: templates,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onGlobalFilterChange: setGlobalFilter,
+    globalFilterFn: "includesString",
+    state: {
+      globalFilter,
+    },
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
+    columnResizeMode: "onChange",
+    meta: {
+      handleEditTemplate,
+      handleDeleteTemplate,
+    },
+  });
+
   return (
-    <div className="p-4">
+    <div className="p-6">
       <h1 className="text-2xl font-bold mb-4">Quản lý Email Template</h1>
 
-      {/* Nút tạo template mới */}
-      <div className="mb-4">
-        <button
-          onClick={handleCreateTemplate}
-          className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          Tạo template mới
-        </button>
+      <div className="flex justify-between mb-4">
+        <Button onClick={handleCreateTemplate}>Tạo template mới</Button>
+        <Input
+          placeholder="Tìm kiếm theo tên, tiêu đề, hoặc nội dung..."
+          value={globalFilter ?? ""}
+          onChange={(event) => setGlobalFilter(event.target.value)}
+          className="max-w-sm"
+        />
       </div>
 
-      {/* Bảng danh sách template */}
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Danh sách template</h2>
-        <table className="w-full border-collapse border border-gray-300">
-          <thead>
-            <tr className="bg-blue-200">
-              <th className="w-1/24 p-2 border">STT</th>
-              <th className="w-1/8 p-2 border">Tên template</th>
-              <th className="w-1/8 p-2 border">Tiêu đề email</th>
-              <th className="p-2 border">Nội dung email</th>
-              <th className="w-1/7 p-2 border">Hành động</th>
-            </tr>
-          </thead>
-          <tbody>
-            {templates.map((template, index) => (
-              <tr key={template.id} className="bg-white">
-                <td className="p-2 border">{index + 1}</td>
-                <td className="p-2 border">{template.name}</td>
-                <td className="p-2 border">{template.title}</td>
-                <td className="p-2 border">
-                  <div
-                    className="max-h-20 overflow-y-auto"
-                    dangerouslySetInnerHTML={{ __html: template.body }}
-                  />
-                </td>
-                <td className="p-2 border">
-                  <button
-                    onClick={() => handleEditTemplate(template)}
-                    className="p-1 px-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 mr-2"
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead
+                    key={header.id}
+                    style={{ width: header.column.getSize() }}
                   >
-                    Chỉnh sửa
-                  </button>
-                  <button
-                    onClick={() => handleDeleteTemplate(template.id)}
-                    className="p-1 px-2 bg-red-500 text-white rounded hover:bg-red-600"
-                  >
-                    Xóa
-                  </button>
-                </td>
-              </tr>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                  </TableHead>
+                ))}
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow key={row.id}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell
+                      key={cell.id}
+                      style={{ width: cell.column.getSize() }}
+                      className="align-top" // Đảm bảo nội dung căn lên trên
+                    >
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  Không có dữ liệu
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </div>
 
-      {/* Pop-up tạo/chỉnh sửa template */}
+      <div className="flex items-center justify-between mt-4">
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            Trang trước
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            Trang sau
+          </Button>
+        </div>
+        <div className="flex items-center space-x-2">
+          <span>
+            Trang{" "}
+            <strong>
+              {table.getState().pagination.pageIndex + 1} /{" "}
+              {table.getPageCount()}
+            </strong>
+          </span>
+          <Select
+            value={table.getState().pagination.pageSize.toString()}
+            onValueChange={(value) => {
+              table.setPageSize(Number(value));
+            }}
+          >
+            <SelectTrigger className="w-[100px]">
+              <SelectValue placeholder="Chọn số hàng" />
+            </SelectTrigger>
+            <SelectContent>
+              {[5, 10, 20, 30, 50].map((pageSize) => (
+                <SelectItem key={pageSize} value={pageSize.toString()}>
+                  {pageSize} hàng
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       {isPopupOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg w-1/2">
+          <div className="bg-white p-6 rounded-lg w-full max-w-2xl">
             <h2 className="text-xl font-semibold mb-4">
               {currentTemplate ? "Chỉnh sửa template" : "Tạo template mới"}
             </h2>
 
-            {/* Form tạo/chỉnh sửa template */}
             <div className="mb-4">
               <label className="block mb-1 font-medium">Tên template</label>
-              <input
-                type="text"
+              <Input
                 name="name"
                 value={formData.name}
                 onChange={handleFormChange}
-                className="p-2 border rounded w-full"
                 placeholder="Nhập tên template"
               />
             </div>
 
             <div className="mb-4">
               <label className="block mb-1 font-medium">Tiêu đề email</label>
-              <input
-                type="text"
+              <Input
                 name="title"
                 value={formData.title}
                 onChange={handleFormChange}
-                className="p-2 border rounded w-full"
                 placeholder="Nhập tiêu đề email (VD: Xin chào {ten})"
               />
             </div>
@@ -237,8 +312,7 @@ export default function EmailTemplatePage() {
             <div className="mb-4">
               <label className="block mb-1 font-medium">Nội dung email</label>
               <p className="text-sm text-gray-900 mt-1">
-                Sử dụng {`{ten}`}, {`{mssv}`}, {`{email}`} để chèn thông tin
-                sinh viên.
+                Sử dụng {`{ten}`}, {`{mssv}`}, {`{email}`} để chèn thông tin sinh viên.
               </p>
               <Editor
                 apiKey="5hpduv8dw5cs809fj9cgji7pofo1uq3bxhtdvaa6tl9jyyns"
@@ -253,27 +327,18 @@ export default function EmailTemplatePage() {
                     "insertdatetime media table paste code help wordcount",
                   ],
                   toolbar:
-                    "undo redo | formatselect | bold italic | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | help",
+                    "undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table mergetags | addcomment showcomments | spellcheckdialog a11ycheck typography | align lineheight | checklist numlist bullist indent outdent | emoticons charmap | removeformat",
                   content_style:
                     "body { font-family:Helvetica,Arial,sans-serif; font-size:14px }",
                 }}
               />
             </div>
 
-            {/* Nút Hủy và Lưu */}
-            <div className="flex justify-end mt-4">
-              <button
-                onClick={() => setIsPopupOpen(false)}
-                className="p-2 bg-gray-500 text-white rounded hover:bg-gray-600 mr-2"
-              >
+            <div className="flex justify-end mt-4 space-x-2">
+              <Button variant="outline" onClick={() => setIsPopupOpen(false)}>
                 Hủy
-              </button>
-              <button
-                onClick={handleSaveTemplate}
-                className="p-2 bg-green-500 text-white rounded hover:bg-green-600"
-              >
-                Lưu
-              </button>
+              </Button>
+              <Button onClick={handleSaveTemplate}>Lưu</Button>
             </div>
           </div>
         </div>
