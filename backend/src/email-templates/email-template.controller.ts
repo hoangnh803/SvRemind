@@ -28,14 +28,13 @@ export class EmailTemplateController {
     @Body() templateData: Partial<EmailTemplate>,
   ): Promise<EmailTemplate> {
     const userId = req.user.id; // Lấy userId từ token JWT
-    console.log('Creating template with userId:', userId);
-    console.log('Template data:', templateData);
     return this.emailTemplateService.create(userId, templateData);
   }
 
   @Get()
   findByUser(@Request() req): Promise<EmailTemplate[]> {
     const userId = req.user.id;
+    console.log('Creating template with userId:', req.user);
     return this.emailTemplateService.findByUser(userId);
   }
 

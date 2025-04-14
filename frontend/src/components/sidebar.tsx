@@ -21,7 +21,7 @@ const menuItems = [
   { name: "Role Management", href: "/role-management", adminOnly: true },
   { name: "Send email", href: "/send-email" },
   { name: "Email Templates", href: "/email-templates" },
-  { name: "Transaction", href: "/transaction" },
+  { name: "Transaction", href: "/transactions" },
   { name: "About us", href: "/about" },
 ];
 

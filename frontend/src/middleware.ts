@@ -7,8 +7,8 @@ export function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Nếu không có token và không phải trang login, chuyển hướng về /login
-  if (!token && pathname !== '/login') {
+  // Nếu không có token và không phải trang login hoặc /mobile-scan, chuyển hướng về /login
+  if (!token && (pathname !== '/login' && pathname !== '/mobile-scan')) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 

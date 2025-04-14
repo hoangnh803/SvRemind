@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 // src/auth/auth.controller.ts
 import {
@@ -45,7 +46,7 @@ export class AuthController {
   @Get('roles')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('Admin')
-  async getAllRoles() {
+  getAllRoles() {
     return this.authService.getAllRoles();
   }
 }

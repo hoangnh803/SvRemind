@@ -9,8 +9,34 @@ import { Html5QrcodeScanner } from "html5-qrcode";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Editor } from "@tinymce/tinymce-react";
+import {
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  getPaginationRowModel,
+  getFilteredRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { columns } from "./columns";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
-// Định nghĩa interface cho dữ liệu sinh viên
 interface Student {
   mssv: string;
   ten: string;
@@ -19,7 +45,6 @@ interface Student {
   quanly: string;
 }
 
-// Định nghĩa interface cho Email Template
 interface EmailTemplate {
   id: string;
   name: string;
@@ -29,7 +54,8 @@ interface EmailTemplate {
 
 export default function SendEmailPage() {
   const [recipients, setRecipients] = useState<Student[]>([]);
-  const [lastScannedStudent, setLastScannedStudent] = useState<Student | null>(null);
+  const [recentlyAddedStudents, setRecentlyAddedStudents] = useState<Student[]>([]);
+  const [currentSlide, setCurrentSlide] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
   const [manualUrl, setManualUrl] = useState("");
   const [inputMethod, setInputMethod] = useState<"camera" | "scanner" | "manual">("camera");
@@ -37,48 +63,59 @@ export default function SendEmailPage() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [emailForm, setEmailForm] = useState({ name: "", title: "", body: "" });
-  const lastProcessedMssv = useRef<string | null>(null);
+  const [globalFilter, setGlobalFilter] = useState("");
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
   const processedMssvSet = useRef<Set<string>>(new Set());
 
-  // Hàm lấy danh sách template từ API
   const fetchTemplates = async () => {
     try {
-      const response = await axios.get<EmailTemplate[]>("http://localhost:3001/email-templates", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
+      const response = await axios.get<EmailTemplate[]>(
+        "http://localhost:3001/email-templates",
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
+      );
       setTemplates(response.data);
     } catch (error) {
       console.error("Lỗi khi lấy danh sách template:", error);
     }
   };
 
-  // Lấy danh sách template khi trang được tải
   useEffect(() => {
     fetchTemplates();
   }, []);
+  
 
-  // Khởi tạo và chạy QR scanner
-  const startQrScanner = () => {
-    const scanner = new Html5QrcodeScanner("qr-reader", { fps: 10, qrbox: 250 }, false);
-    scanner.render(onScanSuccess, onScanFailure);
-    scannerRef.current = scanner;
-    return scanner;
+  const startQrScanner = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      stream.getTracks().forEach((track) => track.stop());
+      const scanner = new Html5QrcodeScanner(
+        "qr-reader",
+        {
+          fps: 10,
+        },
+        false
+      );
+      scanner.render(onScanSuccess, onScanFailure);
+      scannerRef.current = scanner;
+      return scanner;
+    } catch (err) {
+      toast.error("Không thể truy cập camera. Hãy cấp quyền cho ứng dụng.");
+      setIsScanning(false);
+    }
   };
 
-  // Xử lý khi quét QR thành công
   const onScanSuccess = (decodedText: string) => {
     fetchStudentData(decodedText, true);
   };
 
-  // Xử lý khi quét QR thất bại
   const onScanFailure = (error: any) => {
     console.warn(`Lỗi quét mã QR: ${error}`);
   };
 
-  // Lấy dữ liệu sinh viên từ barcode
-  const fetchStudentData = async (url: string, isQrScan: boolean = false) => {
-    if (isProcessing) return;
+  const fetchStudentData = async (url: string, isQrScan: boolean = false): Promise<Student | null> => {
+    if (isProcessing) return null;
     setIsProcessing(true);
 
     try {
@@ -87,59 +124,75 @@ export default function SendEmailPage() {
       const studentData: Student = response.data as Student;
 
       if (processedMssvSet.current.has(studentData.mssv)) {
-        toast.info("Sinh viên này đã có trong danh sách.");
-        return;
+        toast.info(`Sinh viên ${studentData.ten} đã có trong danh sách.`);
+        return null;
       }
 
       processedMssvSet.current.add(studentData.mssv);
-      setLastScannedStudent(studentData);
-      setRecipients((prev) => [...prev, studentData]);
-      toast.success(`Đã thêm: ${studentData.ten} - ${studentData.mssv}`);
-
+      setRecipients((prev) => [...prev, studentData]); // Add to recipients
       if (isQrScan) {
+        setRecentlyAddedStudents([studentData]);
+        setCurrentSlide(0);
         scannerRef.current?.pause();
         setTimeout(() => scannerRef.current?.resume(), 1000);
       }
+      toast.success(`Đã thêm: ${studentData.ten} - ${studentData.mssv}`);
+      return studentData;
     } catch (error) {
       console.error("Lỗi khi lấy dữ liệu sinh viên:", error);
-      toast.error("Không thể lấy thông tin sinh viên. Vui lòng thử lại.");
+      toast.error("Không thể lấy thông tin sinh viên từ URL này.");
+      return null;
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Xử lý khi nhập tay
-  const handleManualAdd = () => {
-    if (manualUrl.trim()) {
-      fetchStudentData(manualUrl);
+  const handleManualAdd = async () => {
+    if (!manualUrl.trim()) {
+      toast.warn("Vui lòng nhập ít nhất một URL barcode.");
+      return;
+    }
+
+    const urls = manualUrl.split("\n").map((url) => url.trim()).filter((url) => url);
+    if (urls.length === 0) {
+      toast.warn("Không có URL hợp lệ để xử lý.");
+      return;
+    }
+
+    const newStudents: Student[] = [];
+    for (const url of urls) {
+      const student = await fetchStudentData(url);
+      if (student) {
+        newStudents.push(student);
+      }
+    }
+
+    if (newStudents.length > 0) {
+      setRecentlyAddedStudents(newStudents);
+      setCurrentSlide(0);
       setManualUrl("");
     } else {
-      toast.warn("Vui lòng nhập URL barcode.");
+      toast.info("Không thêm được sinh viên nào do trùng lặp hoặc lỗi.");
     }
   };
 
-  // Xóa sinh viên khỏi danh sách
   const handleDeleteStudent = (mssv: string) => {
     setRecipients((prev) => prev.filter((student) => student.mssv !== mssv));
-    if (lastScannedStudent && lastScannedStudent.mssv === mssv) {
-      setLastScannedStudent(null);
-    }
+    setRecentlyAddedStudents((prev) => prev.filter((student) => student.mssv !== mssv));
     processedMssvSet.current.delete(mssv);
     toast.success("Đã xóa sinh viên khỏi danh sách.");
   };
 
-  // Khởi tạo scanner khi dùng camera
   useEffect(() => {
     if (isScanning && inputMethod === "camera") {
       const scanner = startQrScanner();
       return () => {
-        scanner.clear();
+        scanner.then((resolvedScanner) => resolvedScanner?.clear());
         scannerRef.current = null;
       };
     }
   }, [isScanning, inputMethod]);
 
-  // Xử lý khi chọn template
   const handleTemplateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const templateId = e.target.value;
     setSelectedTemplate(templateId);
@@ -157,18 +210,15 @@ export default function SendEmailPage() {
     }
   };
 
-  // Xử lý thay đổi trường trong form
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setEmailForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Xử lý thay đổi nội dung email trong TinyMCE
   const handleEditorChange = (content: string) => {
     setEmailForm((prev) => ({ ...prev, body: content }));
   };
 
-  // Lưu template
   const handleSaveTemplate = async () => {
     if (!emailForm.name || !emailForm.title || !emailForm.body) {
       toast.warn("Vui lòng điền đầy đủ tên template, tiêu đề và nội dung email.");
@@ -177,7 +227,6 @@ export default function SendEmailPage() {
 
     try {
       if (selectedTemplate) {
-        // Cập nhật template đã chọn
         await axios.put(
           `http://localhost:3001/email-templates/${selectedTemplate}`,
           emailForm,
@@ -187,14 +236,16 @@ export default function SendEmailPage() {
         );
         toast.success("Đã cập nhật template thành công!");
       } else {
-        // Tạo template mới
-        const response = await axios.post<{ id: string }>("http://localhost:3001/email-templates", emailForm, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
-        setSelectedTemplate(String(response.data.id)); // Chọn template vừa tạo
+        const response = await axios.post<{ id: string }>(
+          "http://localhost:3001/email-templates",
+          emailForm,
+          {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          }
+        );
+        setSelectedTemplate(String(response.data.id));
         toast.success("Đã lưu template mới thành công!");
       }
-      // Làm mới danh sách templates từ API sau khi lưu
       await fetchTemplates();
     } catch (error) {
       console.error("Lỗi khi lưu template:", error);
@@ -202,7 +253,6 @@ export default function SendEmailPage() {
     }
   };
 
-  // Gửi email
   const handleSendEmail = async () => {
     if (!emailForm.title || !emailForm.body) {
       toast.warn("Vui lòng điền tiêu đề và nội dung email.");
@@ -217,9 +267,14 @@ export default function SendEmailPage() {
       const response = await axios.post(
         "http://localhost:3001/send-email",
         {
-          recipients: recipients.map((r) => r.email),
+          recipients: recipients.map((student) => ({
+            email: student.email,
+            ten: student.ten,
+            mssv: student.mssv,
+          })),
           subject: emailForm.title,
           body: emailForm.body,
+          emailTemplateId: selectedTemplate ? parseInt(selectedTemplate) : null,
         },
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -228,159 +283,298 @@ export default function SendEmailPage() {
       toast.success("Email đã được gửi thành công!");
       setRecipients([]);
       processedMssvSet.current.clear();
-      setLastScannedStudent(null);
+      setRecentlyAddedStudents([]);
+      setCurrentSlide(0);
     } catch (error) {
       console.error("Lỗi khi gửi email:", error);
       toast.error("Không thể gửi email. Vui lòng thử lại.");
     }
   };
 
+  const table = useReactTable({
+    data: recipients,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onGlobalFilterChange: setGlobalFilter,
+    globalFilterFn: "includesString",
+    state: { globalFilter },
+    initialState: { pagination: { pageSize: 10 } },
+    columnResizeMode: "onChange",
+    meta: { handleDeleteStudent },
+  });
+
+  const handlePrevSlide = () => {
+    setCurrentSlide((prev) => (prev === 0 ? recentlyAddedStudents.length - 1 : prev - 1));
+  };
+
+  const handleNextSlide = () => {
+    setCurrentSlide((prev) => (prev === recentlyAddedStudents.length - 1 ? 0 : prev + 1));
+  };
+
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Gửi Email</h1>
 
-      {/* Phần quét mã và danh sách người nhận */}
-      <div className="flex mb-6">
-        <div className="w-1/2 pr-4">
-          <div className="mb-4">
-            <label className="mr-4">
-              <input
-                type="radio"
-                value="camera"
-                checked={inputMethod === "camera"}
-                onChange={() => setInputMethod("camera")}
-              />
-              Dùng Camera để quét QR
-            </label>
-            <label className="mr-4">
-              <input
-                type="radio"
-                value="scanner"
-                checked={inputMethod === "scanner"}
-                onChange={() => setInputMethod("scanner")}
-              />
-              Dùng máy quét QR
-            </label>
-            <label>
-              <input
-                type="radio"
-                value="manual"
-                checked={inputMethod === "manual"}
-                onChange={() => setInputMethod("manual")}
-              />
-              Nhập tay
-            </label>
-          </div>
+      {/* Input Method Selector */}
+      <div className="mb-4 flex space-x-4">
+        <label className="flex items-center space-x-2">
+          <input
+            type="radio"
+            value="camera"
+            checked={inputMethod === "camera"}
+            onChange={() => setInputMethod("camera")}
+          />
+          <span>Dùng Camera</span>
+        </label>
+        <label className="flex items-center space-x-2">
+          <input
+            type="radio"
+            value="scanner"
+            checked={inputMethod === "scanner"}
+            onChange={() => setInputMethod("scanner")}
+          />
+          <span>Dùng máy quét QR</span>
+        </label>
+        <label className="flex items-center space-x-2">
+          <input
+            type="radio"
+            value="manual"
+            checked={inputMethod === "manual"}
+            onChange={() => setInputMethod("manual")}
+          />
+          <span>Nhập URL</span>
+        </label>
+      </div>
 
-          {inputMethod === "camera" && (
-            <>
-              {!isScanning && (
-                <button
-                  onClick={() => setIsScanning(true)}
-                  className="p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+      {/* Dynamic Input Section */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white p-4 rounded shadow min-h-[320px] flex items-center justify-center">
+          {inputMethod === "camera" &&
+            (!isScanning ? (
+              <Button onClick={() => setIsScanning(true)}>
+                Bắt đầu quét QR bằng Camera
+              </Button>
+            ) : (
+              <div className="w-full">
+                <div id="qr-reader" className="w-full border rounded" />
+                <Button
+                  variant="destructive"
+                  className="mt-2"
+                  onClick={() => setIsScanning(false)}
                 >
-                  Bắt đầu quét QR bằng Camera
-                </button>
-              )}
-              {isScanning && (
-                <div className="mt-4">
-                  <div id="qr-reader" style={{ width: "500px", height: "500px" }}></div>
-                  <button
-                    onClick={() => setIsScanning(false)}
-                    className="mt-2 p-2 bg-red-500 text-white rounded hover:bg-red-600"
-                  >
-                    Dừng quét
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+                  Dừng quét
+                </Button>
+              </div>
+            ))}
+
           {inputMethod === "scanner" && (
-            <div>
-              <p>Vui lòng sử dụng máy quét QR để quét mã.</p>
-            </div>
+            <p className="text-gray-600">
+              Vui lòng sử dụng máy quét QR để quét mã.
+            </p>
           )}
+
           {inputMethod === "manual" && (
-            <div>
-              <input
-                type="text"
+            <div className="w-full">
+              <textarea
                 value={manualUrl}
                 onChange={(e) => setManualUrl(e.target.value)}
-                placeholder="Nhập URL barcode"
-                className="p-2 border rounded w-full mb-2"
+                placeholder="Nhập URL barcode (mỗi dòng một URL)"
+                className="mb-2 w-full h-32 p-2 border rounded"
               />
-              <button
-                onClick={handleManualAdd}
-                className="p-2 bg-green-500 text-white rounded hover:bg-green-600"
-              >
-                Thêm sinh viên
-              </button>
+              <Button onClick={handleManualAdd}>Thêm sinh viên</Button>
             </div>
           )}
         </div>
 
-        <div className="w-1/2 pl-4">
-          {lastScannedStudent && (
-            <div className="p-4 bg-gray-100 rounded flex">
-              <img
-                src={`https://api.toolhub.app/hust/AnhDaiDien?mssv=${lastScannedStudent.mssv}`}
-                alt="Ảnh thẻ"
-                width="100"
-                className="mr-4"
-                onError={(e) => (e.currentTarget.src = "/placeholder.png")}
-              />
-              <div>
-                <h2 className="text-xl font-semibold">Thông tin sinh viên</h2>
-                <p><strong>Tên:</strong> {lastScannedStudent.ten}</p>
-                <p><strong>MSSV:</strong> {lastScannedStudent.mssv}</p>
-                <p><strong>Email:</strong> {lastScannedStudent.email}</p>
-                <p><strong>Lớp:</strong> {lastScannedStudent.lop}</p>
-                <p><strong>Trường:</strong> {lastScannedStudent.quanly}</p>
+        <div className="bg-white p-4 rounded shadow min-h-[320px] flex flex-col justify-center">
+          {recentlyAddedStudents.length > 0 ? (
+            <div className="relative">
+              <h2 className="text-lg font-semibold mb-2">Thông tin sinh viên</h2>
+              <div className="flex items-center justify-between">
+                {recentlyAddedStudents.length > 1 && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handlePrevSlide}
+                    className="absolute left-0"
+                  >
+                    <ChevronLeft className="h-6 w-6" />
+                  </Button>
+                )}
+                <div className="flex-1 flex justify-center">
+                  <div className="text-center">
+                    <img
+                      src={`https://api.toolhub.app/hust/AnhDaiDien?mssv=${recentlyAddedStudents[currentSlide].mssv}`}
+                      alt="Ảnh thẻ"
+                      className="w-48 rounded border mx-auto"
+                      onError={(e) => (e.currentTarget.src = "/placeholder.png")}
+                    />
+                    <p>
+                      <strong>Tên:</strong> {recentlyAddedStudents[currentSlide].ten}
+                    </p>
+                    <p>
+                      <strong>MSSV:</strong> {recentlyAddedStudents[currentSlide].mssv}
+                    </p>
+                    <p>
+                      <strong>Email:</strong> {recentlyAddedStudents[currentSlide].email}
+                    </p>
+                    <p>
+                      <strong>Lớp:</strong> {recentlyAddedStudents[currentSlide].lop}
+                    </p>
+                    <p>
+                      <strong>Trường:</strong> {recentlyAddedStudents[currentSlide].quanly}
+                    </p>
+                  </div>
+                </div>
+                {recentlyAddedStudents.length > 1 && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleNextSlide}
+                    className="absolute right-0"
+                  >
+                    <ChevronRight className="h-6 w-6" />
+                  </Button>
+                )}
               </div>
+              {recentlyAddedStudents.length > 1 && (
+                <div className="flex justify-center mt-2">
+                  {recentlyAddedStudents.map((_, index) => (
+                    <span
+                      key={index}
+                      className={`h-2 w-2 rounded-full mx-1 ${
+                        index === currentSlide ? "bg-blue-500" : "bg-gray-300"
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
+          ) : (
+            <p className="text-gray-500 text-center">Chưa có sinh viên nào được thêm.</p>
           )}
         </div>
       </div>
 
-      {/* Danh sách người nhận */}
       <div className="mb-6">
         <h2 className="text-xl font-semibold mb-2">Danh sách người nhận</h2>
-        <table className="w-full border-collapse border border-gray-300">
-          <thead>
-            <tr className="bg-blue-200">
-              <th className="p-2 border">STT</th>
-              <th className="p-2 border">Họ và tên</th>
-              <th className="p-2 border">MSSV</th>
-              <th className="p-2 border">Email</th>
-              <th className="p-2 border"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {recipients.map((student, index) => (
-              <tr key={student.mssv} className="bg-white">
-                <td className="p-2 border">{index + 1}</td>
-                <td className="p-2 border">{student.ten}</td>
-                <td className="p-2 border">{student.mssv}</td>
-                <td className="p-2 border">{student.email}</td>
-                <td className="p-2 border">
-                  <button
-                    onClick={() => handleDeleteStudent(student.mssv)}
-                    className="p-1 px-2 bg-red-500 text-white rounded hover:bg-red-600"
+        <div className="flex justify-end mb-4">
+          <Input
+            placeholder="Tìm kiếm theo tên, MSSV, hoặc email..."
+            value={globalFilter ?? ""}
+            onChange={(event) => setGlobalFilter(event.target.value)}
+            className="max-w-sm"
+          />
+        </div>
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <TableHead
+                      key={header.id}
+                      style={{ width: header.column.getSize() }}
+                    >
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        style={{ width: cell.column.getSize() }}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center"
                   >
-                    Xóa
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    Không có dữ liệu
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="flex items-center justify-between mt-4">
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              Trang trước
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              Trang sau
+            </Button>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span>
+              Trang{" "}
+              <strong>
+                {table.getState().pagination.pageIndex + 1} /{" "}
+                {table.getPageCount()}
+              </strong>
+            </span>
+            <Select
+              value={table.getState().pagination.pageSize.toString()}
+              onValueChange={(value) => {
+                table.setPageSize(Number(value));
+              }}
+            >
+              <SelectTrigger className="w-[100px]">
+                <SelectValue placeholder="Chọn số hàng" />
+              </SelectTrigger>
+              <SelectContent>
+                {[5, 10, 20, 30, 50].map((pageSize) => (
+                  <SelectItem key={pageSize} value={pageSize.toString()}>
+                    {pageSize} hàng
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
 
-      {/* Phần soạn email */}
       <div className="mb-6">
         <h2 className="text-xl font-semibold mb-2">Soạn Email</h2>
         <div className="mb-4">
-          <label className="block mb-1 font-medium">Chọn template (tùy chọn)</label>
+          <label className="block mb-1 font-medium">
+            Chọn template (tùy chọn)
+          </label>
           <select
             value={selectedTemplate || ""}
             onChange={handleTemplateChange}
@@ -395,34 +589,27 @@ export default function SendEmailPage() {
           </select>
         </div>
 
-        <div className="mb-4 flex items-center">
+        <div className="mb-4 flex place-items-end">
           <div className="w-3/4">
             <label className="block mb-1 font-medium">Tên template</label>
-            <input
-              type="text"
+            <Input
               name="name"
               value={emailForm.name}
               onChange={handleFormChange}
-              className="p-2 border rounded w-full"
               placeholder="Nhập tên template (nếu muốn lưu)"
             />
           </div>
-          <button
-            onClick={handleSaveTemplate}
-            className="ml-4 p-2 bg-blue-500 text-white rounded hover:bg-blue-600 self-end"
-          >
+          <Button onClick={handleSaveTemplate} className="ml-4">
             Lưu template
-          </button>
+          </Button>
         </div>
 
         <div className="mb-4">
           <label className="block mb-1 font-medium">Tiêu đề email</label>
-          <input
-            type="text"
+          <Input
             name="title"
             value={emailForm.title}
             onChange={handleFormChange}
-            className="p-2 border rounded w-full"
             placeholder="Nhập tiêu đề email (VD: Xin chào {ten})"
           />
         </div>
@@ -439,22 +626,16 @@ export default function SendEmailPage() {
             init={{
               height: 300,
               menubar: false,
-              plugins: [
-                "advlist autolink lists link image charmap print preview anchor",
-                "searchreplace visualblocks code fullscreen",
-              ],
-              toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table mergetags | addcomment showcomments | spellcheckdialog a11ycheck typography | align lineheight | checklist numlist bullist indent outdent | emoticons charmap | removeformat',
-              content_style: "body { font-family:Helvetica,Arial,sans-serif; font-size:14px }",
+              plugins: [],
+              toolbar:
+                "undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table mergetags | addcomment showcomments | spellcheckdialog a11ycheck typography | align lineheight | checklist numlist bullist indent outdent | emoticons charmap | removeformat",
+              content_style:
+                "body { font-family:Helvetica,Arial,sans-serif; font-size:14px }",
             }}
           />
         </div>
 
-        <button
-          onClick={handleSendEmail}
-          className="p-2 bg-green-500 text-white rounded hover:bg-green-600"
-        >
-          Gửi Email
-        </button>
+        <Button onClick={handleSendEmail}>Gửi Email</Button>
       </div>
 
       <ToastContainer />

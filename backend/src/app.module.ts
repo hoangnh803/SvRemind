@@ -15,6 +15,9 @@ import { Transaction } from './transactions/entities/transaction.entity';
 import { UsersModule } from './users/users.module';
 import { HttpModule } from '@nestjs/axios';
 import { EmailTemplateModule } from './email-templates/email-template.module';
+import { EmailModule } from './email/email.module';
+import { TransactionsModule } from './transactions/transactions.module';
+import { SessionModule } from './session/session.module';
 
 @Module({
   imports: [
@@ -33,6 +36,9 @@ import { EmailTemplateModule } from './email-templates/email-template.module';
     AuthModule,
     UsersModule,
     HttpModule,
+    EmailModule,
+    TransactionsModule,
+    SessionModule,
   ],
   controllers: [AppController, ProxyController],
   providers: [AppService],
