@@ -4,18 +4,19 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 interface Transaction {
   id: number;
   sender: string;
   receivers: string;
-  emailTemplateId: number;
+  emailTemplateId: number | null;
+  title: string;
   body: string;
   plantDate: string | null;
   sendDate: string | null;
   createdBy: string;
-  emailTemplate: {
+  emailTemplate?: {
     id: number;
     name: string;
     title: string;
@@ -62,7 +63,7 @@ export default function TransactionDetailPage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Chi tiết Email Đã Gửi</h1>
-        <Button className="cursor-pointer" onClick={() => router.push("/transactions") }>
+        <Button className="cursor-pointer" onClick={() => router.push("/transactions")}>
           Quay lại danh sách
         </Button>
       </div>
@@ -78,12 +79,12 @@ export default function TransactionDetailPage() {
               <p>{transaction.receivers}</p>
             </div>
             <div>
-              <strong>Tiêu đề email:</strong>
-              <p>{transaction.emailTemplate.title}</p>
+              <strong>Tiêu đề:</strong>
+              <p>{transaction.title}</p>
             </div>
             <div>
               <strong>Tên template:</strong>
-              <p>{transaction.emailTemplate.name}</p>
+              <p>{transaction.emailTemplate?.name ?? "Không có template"}</p>
             </div>
             <div>
               <strong>Ngày gửi:</strong>

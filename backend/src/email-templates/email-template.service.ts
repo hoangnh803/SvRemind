@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Injectable,
   NotFoundException,
@@ -7,6 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EmailTemplate } from './entities/email-template.entity';
 import { User } from '../users/entities/user.entity';
+import { CreateEmailTemplateDto } from './dto/create-email-template.dto';
 
 @Injectable()
 export class EmailTemplateService {
@@ -18,7 +22,7 @@ export class EmailTemplateService {
   // Tạo mới email template
   async create(
     userId: number,
-    templateData: Partial<EmailTemplate>,
+    templateData: CreateEmailTemplateDto,
   ): Promise<EmailTemplate> {
     // Validate input data
     if (!templateData.name || !templateData.title || !templateData.body) {
@@ -77,7 +81,7 @@ export class EmailTemplateService {
   async update(
     id: number,
     userId: number,
-    templateData: Partial<EmailTemplate>,
+    templateData: Partial<CreateEmailTemplateDto>,
   ): Promise<EmailTemplate> {
     // Kiểm tra xem templateData có chứa ít nhất một trường hợp lệ để cập nhật không
     const updateData: Partial<EmailTemplate> = {};
@@ -109,7 +113,7 @@ export class EmailTemplateService {
         .update(EmailTemplate)
         .set(updateData)
         .where('id = :id', { id })
-        .andWhere('user.id = :userId', { userId }) // Sửa lại để khớp với quan hệ
+        .andWhere('user.id = :userId', { userId })
         .execute();
 
       if (result.affected === 0) {

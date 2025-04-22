@@ -37,7 +37,8 @@ interface Transaction {
   id: number;
   sender: string;
   receivers: string;
-  emailTemplateId: number;
+  emailTemplateId: number | null;
+  title: string;
   body: string;
   plantDate: string | null;
   sendDate: string | null;

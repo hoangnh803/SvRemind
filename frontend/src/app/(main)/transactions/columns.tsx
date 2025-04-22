@@ -10,6 +10,7 @@ interface Transaction {
   sender: string;
   receivers: string;
   emailTemplateId: number;
+  title: string;
   body: string;
   plantDate: string | null;
   sendDate: string | null;
@@ -24,7 +25,7 @@ interface Transaction {
 
 export const columns: ColumnDef<Transaction>[] = [
   {
-    accessorKey: "emailTemplate.title",
+    accessorKey: "title",
     header: ({ column }) => (
       <Button
         className="!p-0"
@@ -37,7 +38,7 @@ export const columns: ColumnDef<Transaction>[] = [
     ),
     cell: ({ row }) => (
       <div className="w-[150px] truncate">
-        {row.original.emailTemplate.title}
+        {row.original.title}
       </div>
     ),
     size: 150,

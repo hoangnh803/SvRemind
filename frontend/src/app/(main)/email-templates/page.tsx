@@ -41,7 +41,9 @@ interface EmailTemplate {
 export default function EmailTemplatePage() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
-  const [currentTemplate, setCurrentTemplate] = useState<EmailTemplate | null>(null);
+  const [currentTemplate, setCurrentTemplate] = useState<EmailTemplate | null>(
+    null
+  );
   const [formData, setFormData] = useState({ name: "", title: "", body: "" });
   const [globalFilter, setGlobalFilter] = useState("");
 
@@ -226,7 +228,10 @@ export default function EmailTemplatePage() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
                   Không có dữ liệu
                 </TableCell>
               </TableRow>
@@ -298,38 +303,40 @@ export default function EmailTemplatePage() {
                 placeholder="Nhập tên template"
               />
             </div>
-
-            <div className="mb-4">
-              <label className="block mb-1 font-medium">Tiêu đề email</label>
-              <Input
-                name="title"
-                value={formData.title}
-                onChange={handleFormChange}
-                placeholder="Nhập tiêu đề email (VD: Xin chào {ten})"
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="block mb-1 font-medium">Nội dung email</label>
+            <div className="mb-6 p-2 border rounded-lg shadow-sm bg-white">
               <p className="text-sm text-gray-900 mt-1">
-                Sử dụng {`{ten}`}, {`{mssv}`}, {`{email}`} để chèn thông tin sinh viên.
+                Sử dụng {`{ten}`} (tên), {`{hoVaTen}`} (họ và tên đầy đủ),{" "}
+                {`{mssv}`}, {`{email}`} để chèn thông tin sinh viên vào tiêu đề
+                và nội dung.
               </p>
-              <Editor
-                apiKey="5hpduv8dw5cs809fj9cgji7pofo1uq3bxhtdvaa6tl9jyyns"
-                value={formData.body}
-                onEditorChange={handleEditorChange}
-                init={{
-                  height: 300,
-                  menubar: false,
-                  plugins: [
+              <div className="mb-2">
+                <label className="block mb-1 font-medium">Tiêu đề email</label>
+                <Input
+                  name="title"
+                  value={formData.title}
+                  onChange={handleFormChange}
+                  placeholder="Nhập tiêu đề email (VD: Xin chào {ten})"
+                />
+              </div>
 
-                  ],
-                  toolbar:
-                    "undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table mergetags | addcomment showcomments | spellcheckdialog a11ycheck typography | align lineheight | checklist numlist bullist indent outdent | emoticons charmap | removeformat",
-                  content_style:
-                    "body { font-family:Helvetica,Arial,sans-serif; font-size:14px }",
-                }}
-              />
+              <div className="mb-2">
+                <label className="block mb-1 font-medium">Nội dung email</label>
+
+                <Editor
+                  apiKey="5hpduv8dw5cs809fj9cgji7pofo1uq3bxhtdvaa6tl9jyyns"
+                  value={formData.body}
+                  onEditorChange={handleEditorChange}
+                  init={{
+                    height: 300,
+                    menubar: false,
+                    plugins: [],
+                    toolbar:
+                      "undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table mergetags | addcomment showcomments | spellcheckdialog a11ycheck typography | align lineheight | checklist numlist bullist indent outdent | emoticons charmap | removeformat",
+                    content_style:
+                      "body { font-family:Helvetica,Arial,sans-serif; font-size:14px }",
+                  }}
+                />
+              </div>
             </div>
 
             <div className="flex justify-end mt-4 space-x-2">

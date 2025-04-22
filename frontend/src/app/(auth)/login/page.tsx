@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/login/page.tsx
 'use client';
 
@@ -8,7 +9,7 @@ import { setCookie } from 'cookies-next';
 
 export default function LoginPage() {
   const [credentials, setCredentials] = useState({
-    username: '',
+    email: '',
     password: '',
   });
   const [error, setError] = useState('');
@@ -45,8 +46,8 @@ export default function LoginPage() {
             <input
               type="email"
               className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={credentials.username}
-              onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
+              value={credentials.email}
+              onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
               placeholder="VD: hoang.nh215581@sis.hust.edu.vn"
             />
           </div>

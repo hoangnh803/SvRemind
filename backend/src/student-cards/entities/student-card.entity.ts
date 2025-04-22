@@ -27,4 +27,5 @@ export class StudentCard {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   @ManyToOne(() => User, (user) => user.studentCards)
   user: User;
+  cardNumber: string;
 }

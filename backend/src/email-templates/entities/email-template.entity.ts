@@ -1,5 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  OneToMany,
+} from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { Transaction } from '../../transactions/entities/transaction.entity';
 
 @Entity()
 export class EmailTemplate {
@@ -15,8 +22,9 @@ export class EmailTemplate {
   @Column({ type: 'text' })
   body: string;
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   @ManyToOne(() => User, (user) => user.emailTemplates)
   user: User;
-  transactions: any;
+
+  @OneToMany(() => Transaction, (transaction) => transaction.emailTemplate)
+  transactions: Transaction[];
 }

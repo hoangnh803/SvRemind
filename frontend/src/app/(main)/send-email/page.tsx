@@ -64,7 +64,10 @@ export default function SendEmailPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [emailForm, setEmailForm] = useState({ name: "", title: "", body: "" });
   const [globalFilter, setGlobalFilter] = useState("");
+  const [scannerInput, setScannerInput] = useState("");
+  const [isScannerActive, setIsScannerActive] = useState(false);
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerInputRef = useRef<HTMLInputElement | null>(null);
   const processedMssvSet = useRef<Set<string>>(new Set());
 
   const fetchTemplates = async () => {
@@ -84,7 +87,6 @@ export default function SendEmailPage() {
   useEffect(() => {
     fetchTemplates();
   }, []);
-  
 
   const startQrScanner = async () => {
     try {
@@ -92,9 +94,7 @@ export default function SendEmailPage() {
       stream.getTracks().forEach((track) => track.stop());
       const scanner = new Html5QrcodeScanner(
         "qr-reader",
-        {
-          fps: 10,
-        },
+        { fps: 10 },
         false
       );
       scanner.render(onScanSuccess, onScanFailure);
@@ -114,12 +114,17 @@ export default function SendEmailPage() {
     console.warn(`Lỗi quét mã QR: ${error}`);
   };
 
-  const fetchStudentData = async (url: string, isQrScan: boolean = false): Promise<Student | null> => {
+  const fetchStudentData = async (
+    url: string,
+    isQrScan: boolean = false
+  ): Promise<Student | null> => {
     if (isProcessing) return null;
     setIsProcessing(true);
 
     try {
-      const apiUrl = `http://localhost:3001/proxy/student?barcode=${encodeURIComponent(url)}`;
+      const apiUrl = `http://localhost:3001/proxy/student?barcode=${encodeURIComponent(
+        url
+      )}`;
       const response = await axios.get(apiUrl);
       const studentData: Student = response.data as Student;
 
@@ -129,13 +134,9 @@ export default function SendEmailPage() {
       }
 
       processedMssvSet.current.add(studentData.mssv);
-      setRecipients((prev) => [...prev, studentData]); // Add to recipients
-      if (isQrScan) {
-        setRecentlyAddedStudents([studentData]);
-        setCurrentSlide(0);
-        scannerRef.current?.pause();
-        setTimeout(() => scannerRef.current?.resume(), 1000);
-      }
+      setRecipients((prev) => [...prev, studentData]);
+      setRecentlyAddedStudents((prev) => [studentData, ...prev.slice(0, 4)]);
+      setCurrentSlide(0);
       toast.success(`Đã thêm: ${studentData.ten} - ${studentData.mssv}`);
       return studentData;
     } catch (error) {
@@ -153,7 +154,10 @@ export default function SendEmailPage() {
       return;
     }
 
-    const urls = manualUrl.split("\n").map((url) => url.trim()).filter((url) => url);
+    const urls = manualUrl
+      .split("\n")
+      .map((url) => url.trim())
+      .filter((url) => url);
     if (urls.length === 0) {
       toast.warn("Không có URL hợp lệ để xử lý.");
       return;
@@ -178,7 +182,9 @@ export default function SendEmailPage() {
 
   const handleDeleteStudent = (mssv: string) => {
     setRecipients((prev) => prev.filter((student) => student.mssv !== mssv));
-    setRecentlyAddedStudents((prev) => prev.filter((student) => student.mssv !== mssv));
+    setRecentlyAddedStudents((prev) =>
+      prev.filter((student) => student.mssv !== mssv)
+    );
     processedMssvSet.current.delete(mssv);
     toast.success("Đã xóa sinh viên khỏi danh sách.");
   };
@@ -190,8 +196,21 @@ export default function SendEmailPage() {
         scanner.then((resolvedScanner) => resolvedScanner?.clear());
         scannerRef.current = null;
       };
+    } else {
+      scannerRef.current?.clear();
+      scannerRef.current = null;
+      setIsScanning(false);
+      if (inputMethod !== "scanner") {
+        setIsScannerActive(false);
+      }
     }
   }, [isScanning, inputMethod]);
+
+  useEffect(() => {
+    if (inputMethod === "scanner" && isScannerActive && scannerInputRef.current) {
+      scannerInputRef.current.focus();
+    }
+  }, [inputMethod, isScannerActive]);
 
   const handleTemplateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const templateId = e.target.value;
@@ -221,7 +240,9 @@ export default function SendEmailPage() {
 
   const handleSaveTemplate = async () => {
     if (!emailForm.name || !emailForm.title || !emailForm.body) {
-      toast.warn("Vui lòng điền đầy đủ tên template, tiêu đề và nội dung email.");
+      toast.warn(
+        "Vui lòng điền đầy đủ tên template, tiêu đề và nội dung email."
+      );
       return;
     }
 
@@ -231,7 +252,9 @@ export default function SendEmailPage() {
           `http://localhost:3001/email-templates/${selectedTemplate}`,
           emailForm,
           {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
           }
         );
         toast.success("Đã cập nhật template thành công!");
@@ -240,7 +263,9 @@ export default function SendEmailPage() {
           "http://localhost:3001/email-templates",
           emailForm,
           {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
           }
         );
         setSelectedTemplate(String(response.data.id));
@@ -264,6 +289,12 @@ export default function SendEmailPage() {
     }
 
     try {
+      console.log("Gửi email với thông tin:", {
+        recipients,
+        subject: emailForm.title,
+        body: emailForm.body,
+        emailTemplateId: selectedTemplate ? parseInt(selectedTemplate) : null,
+      });
       const response = await axios.post(
         "http://localhost:3001/send-email",
         {
@@ -307,11 +338,15 @@ export default function SendEmailPage() {
   });
 
   const handlePrevSlide = () => {
-    setCurrentSlide((prev) => (prev === 0 ? recentlyAddedStudents.length - 1 : prev - 1));
+    setCurrentSlide((prev) =>
+      prev === 0 ? recentlyAddedStudents.length - 1 : prev - 1
+    );
   };
 
   const handleNextSlide = () => {
-    setCurrentSlide((prev) => (prev === recentlyAddedStudents.length - 1 ? 0 : prev + 1));
+    setCurrentSlide((prev) =>
+      prev === recentlyAddedStudents.length - 1 ? 0 : prev + 1
+    );
   };
 
   return (
@@ -371,9 +406,40 @@ export default function SendEmailPage() {
             ))}
 
           {inputMethod === "scanner" && (
-            <p className="text-gray-600">
-              Vui lòng sử dụng máy quét QR để quét mã.
-            </p>
+            <div className="w-full text-center">
+              <input
+                ref={scannerInputRef}
+                type="text"
+                value={scannerInput}
+                onChange={(e) => setScannerInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && scannerInput.trim() && isScannerActive) {
+                    e.preventDefault();
+                    fetchStudentData(scannerInput.trim(), true);
+                    setScannerInput("");
+                  }
+                }}
+                className="absolute opacity-0 w-0 h-0"
+              />
+              {!isScannerActive ? (
+                <>
+                  <p className="text-gray-600 mb-4">Chưa bắt đầu quét</p>
+                  <Button onClick={() => setIsScannerActive(true)}>
+                    Bắt đầu quét
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-gray-600 mb-4">Đang chờ dữ liệu từ máy quét...</p>
+                  <Button
+                    variant="destructive"
+                    onClick={() => setIsScannerActive(false)}
+                  >
+                    Dừng quét
+                  </Button>
+                </>
+              )}
+            </div>
           )}
 
           {inputMethod === "manual" && (
@@ -392,7 +458,9 @@ export default function SendEmailPage() {
         <div className="bg-white p-4 rounded shadow min-h-[320px] flex flex-col justify-center">
           {recentlyAddedStudents.length > 0 ? (
             <div className="relative">
-              <h2 className="text-lg font-semibold mb-2">Thông tin sinh viên</h2>
+              <h2 className="text-lg font-semibold mb-2">
+                Thông tin sinh viên
+              </h2>
               <div className="flex items-center justify-between">
                 {recentlyAddedStudents.length > 1 && (
                   <Button
@@ -410,22 +478,29 @@ export default function SendEmailPage() {
                       src={`https://api.toolhub.app/hust/AnhDaiDien?mssv=${recentlyAddedStudents[currentSlide].mssv}`}
                       alt="Ảnh thẻ"
                       className="w-48 rounded border mx-auto"
-                      onError={(e) => (e.currentTarget.src = "/placeholder.png")}
+                      onError={(e) =>
+                        (e.currentTarget.src = "/placeholder.png")
+                      }
                     />
                     <p>
-                      <strong>Tên:</strong> {recentlyAddedStudents[currentSlide].ten}
+                      <strong>Tên:</strong>{" "}
+                      {recentlyAddedStudents[currentSlide].ten}
                     </p>
                     <p>
-                      <strong>MSSV:</strong> {recentlyAddedStudents[currentSlide].mssv}
+                      <strong>MSSV:</strong>{" "}
+                      {recentlyAddedStudents[currentSlide].mssv}
                     </p>
                     <p>
-                      <strong>Email:</strong> {recentlyAddedStudents[currentSlide].email}
+                      <strong>Email:</strong>{" "}
+                      {recentlyAddedStudents[currentSlide].email}
                     </p>
                     <p>
-                      <strong>Lớp:</strong> {recentlyAddedStudents[currentSlide].lop}
+                      <strong>Lớp:</strong>{" "}
+                      {recentlyAddedStudents[currentSlide].lop}
                     </p>
                     <p>
-                      <strong>Trường:</strong> {recentlyAddedStudents[currentSlide].quanly}
+                      <strong>Trường:</strong>{" "}
+                      {recentlyAddedStudents[currentSlide].quanly}
                     </p>
                   </div>
                 </div>
@@ -454,7 +529,9 @@ export default function SendEmailPage() {
               )}
             </div>
           ) : (
-            <p className="text-gray-500 text-center">Chưa có sinh viên nào được thêm.</p>
+            <p className="text-gray-500 text-center">
+              Chưa có sinh viên nào được thêm.
+            </p>
           )}
         </div>
       </div>
@@ -571,71 +648,79 @@ export default function SendEmailPage() {
 
       <div className="mb-6">
         <h2 className="text-xl font-semibold mb-2">Soạn Email</h2>
-        <div className="mb-4">
-          <label className="block mb-1 font-medium">
-            Chọn template (tùy chọn)
-          </label>
-          <select
-            value={selectedTemplate || ""}
-            onChange={handleTemplateChange}
-            className="p-2 border rounded w-full"
-          >
-            <option value="">-- Chọn template hoặc soạn mới --</option>
-            {templates.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.name}
-              </option>
-            ))}
-          </select>
+        <div className="mb-6 p-4 border rounded-lg shadow-sm bg-white">
+          <div className="flex gap-4">
+            <div className="flex-1 flex flex-col gap-4">
+              <div>
+                <label className="block mb-1 font-medium">
+                  Chọn template (tùy chọn)
+                </label>
+                <select
+                  value={selectedTemplate || ""}
+                  onChange={handleTemplateChange}
+                  className="p-2 border rounded w-full"
+                >
+                  <option value="">-- Chọn template hoặc soạn mới --</option>
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block mb-1 font-medium">Tên template</label>
+                <Input
+                  name="name"
+                  value={emailForm.name}
+                  onChange={handleFormChange}
+                  placeholder="Nhập tên template (nếu muốn lưu)"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-center">
+              <Button onClick={handleSaveTemplate} className="h-1/2 px-6">
+                Lưu template
+              </Button>
+            </div>
+          </div>
         </div>
 
-        <div className="mb-4 flex place-items-end">
-          <div className="w-3/4">
-            <label className="block mb-1 font-medium">Tên template</label>
+        <div className="mb-6 p-4 border rounded-lg shadow-sm bg-white">
+          <h3 className="text-lg font-medium mb-2">Nội dung Email</h3>
+          <p className="text-sm text-gray-900 mt-1">
+            Sử dụng {`{ten}`} (tên), {`{hoVaTen}`} (họ và tên đầy đủ),{" "}
+            {`{mssv}`}, {`{email}`} để chèn thông tin sinh viên vào tiêu đề và
+            nội dung.
+          </p>
+          <div className="mb-4">
+            <label className="block mb-1 font-medium">Tiêu đề email</label>
             <Input
-              name="name"
-              value={emailForm.name}
+              name="title"
+              value={emailForm.title}
               onChange={handleFormChange}
-              placeholder="Nhập tên template (nếu muốn lưu)"
+              placeholder="Nhập tiêu đề email (VD: Xin chào {ten})"
             />
           </div>
-          <Button onClick={handleSaveTemplate} className="ml-4">
-            Lưu template
-          </Button>
+          <div className="mb-4">
+            <label className="block mb-1 font-medium">Nội dung email</label>
+            <Editor
+              apiKey="5hpduv8dw5cs809fj9cgji7pofo1uq3bxhtdvaa6tl9jyyns"
+              value={emailForm.body}
+              onEditorChange={handleEditorChange}
+              init={{
+                height: 300,
+                menubar: false,
+                plugins: [],
+                toolbar:
+                  "undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table mergetags | addcomment showcomments | spellcheckdialog a11ycheck typography | align lineheight | checklist numlist bullist indent outdent | emoticons charmap | removeformat",
+                content_style:
+                  "body { font-family:Helvetica,Arial,sans-serif; font-size:14px }",
+              }}
+            />
+          </div>
+          <Button onClick={handleSendEmail}>Gửi Email</Button>
         </div>
-
-        <div className="mb-4">
-          <label className="block mb-1 font-medium">Tiêu đề email</label>
-          <Input
-            name="title"
-            value={emailForm.title}
-            onChange={handleFormChange}
-            placeholder="Nhập tiêu đề email (VD: Xin chào {ten})"
-          />
-        </div>
-
-        <div className="mb-4">
-          <label className="block mb-1 font-medium">Nội dung email</label>
-          <p className="text-sm text-gray-900 mt-1">
-            Sử dụng {`{ten}`}, {`{mssv}`}, {`{email}`} để chèn thông tin sinh viên.
-          </p>
-          <Editor
-            apiKey="5hpduv8dw5cs809fj9cgji7pofo1uq3bxhtdvaa6tl9jyyns"
-            value={emailForm.body}
-            onEditorChange={handleEditorChange}
-            init={{
-              height: 300,
-              menubar: false,
-              plugins: [],
-              toolbar:
-                "undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table mergetags | addcomment showcomments | spellcheckdialog a11ycheck typography | align lineheight | checklist numlist bullist indent outdent | emoticons charmap | removeformat",
-              content_style:
-                "body { font-family:Helvetica,Arial,sans-serif; font-size:14px }",
-            }}
-          />
-        </div>
-
-        <Button onClick={handleSendEmail}>Gửi Email</Button>
       </div>
 
       <ToastContainer />

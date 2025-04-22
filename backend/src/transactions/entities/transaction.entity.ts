@@ -14,8 +14,11 @@ export class Transaction {
   @Column()
   receivers: string;
 
-  @Column()
+  @Column({ nullable: true })
   emailTemplateId: number;
+
+  @Column()
+  title: string;
 
   @Column({ type: 'text' })
   body: string;
