@@ -120,28 +120,63 @@ export default function SendEmailPage() {
   ): Promise<Student | null> => {
     if (isProcessing) return null;
     setIsProcessing(true);
-
+  
     try {
+      // Fetch student data from the external API
       const apiUrl = `http://localhost:3001/proxy/student?barcode=${encodeURIComponent(
         url
       )}`;
       const response = await axios.get(apiUrl);
       const studentData: Student = response.data as Student;
-
-      if (processedMssvSet.current.has(studentData.mssv)) {
-        toast.info(`Sinh viên ${studentData.ten} đã có trong danh sách.`);
+  
+      // Check if studentCode already exists for the authenticated user's email
+      const checkResponse = await axios.get(
+        `http://localhost:3001/student-cards/check?studentCode=${encodeURIComponent(
+          studentData.mssv
+        )}`,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
+      );
+  
+      if ((checkResponse.data as { exists: boolean }).exists) {
+        toast.info(`Sinh viên ${studentData.ten} đã có trong danh sách của bạn.`);
         return null;
       }
-
+  
+      // If not a duplicate, add to processedMssvSet and save to StudentCard
+      if (processedMssvSet.current.has(studentData.mssv)) {
+        toast.info(`Sinh viên ${studentData.ten} đã được xử lý trong phiên này.`);
+        return null;
+      }
+  
       processedMssvSet.current.add(studentData.mssv);
+  
+      // Save to StudentCard
+      const studentCardData = {
+        fullNameNS: studentData.ten,
+        studentCode: studentData.mssv,
+        email: studentData.email,
+        cardCode: url,
+      };
+  
+      await axios.post(
+        "http://localhost:3001/student-cards",
+        studentCardData,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
+      );
+  
+      // Update recipients and recently added students
       setRecipients((prev) => [...prev, studentData]);
       setRecentlyAddedStudents((prev) => [studentData, ...prev.slice(0, 4)]);
       setCurrentSlide(0);
-      toast.success(`Đã thêm: ${studentData.ten} - ${studentData.mssv}`);
+      toast.success(`Đã thêm và lưu: ${studentData.ten} - ${studentData.mssv}`);
       return studentData;
     } catch (error) {
-      console.error("Lỗi khi lấy dữ liệu sinh viên:", error);
-      toast.error("Không thể lấy thông tin sinh viên từ URL này.");
+      console.error("Lỗi khi lấy hoặc lưu dữ liệu sinh viên:", error);
+      toast.error("Không thể lấy hoặc lưu thông tin sinh viên.");
       return null;
     } finally {
       setIsProcessing(false);

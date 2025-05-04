@@ -24,12 +24,14 @@
     "clsx": "^2.1.1",
     "cookies-next": "^5.1.0",
     "html5-qrcode": "^2.3.8",
+    "jose": "^6.0.10",
     "lucide-react": "^0.485.0",
     "next": "15.2.2",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-toastify": "^11.0.5",
+    "recharts": "^2.15.3",
     "tailwind-merge": "^3.0.2",
     "tw-animate-css": "^1.2.5"
   },
@@ -44,5 +46,8 @@
     "eslint-config-next": "15.2.2",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "react-is": "^19.0.0-rc-69d4b800-20241021"
   }
 }

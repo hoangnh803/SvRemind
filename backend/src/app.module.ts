@@ -18,6 +18,8 @@ import { EmailTemplateModule } from './email-templates/email-template.module';
 import { EmailModule } from './email/email.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { SessionModule } from './session/session.module';
+import { StudentCardsModule } from './student-cards/student-cards.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -39,6 +41,8 @@ import { SessionModule } from './session/session.module';
     EmailModule,
     TransactionsModule,
     SessionModule,
+    StudentCardsModule,
+    DashboardModule,
   ],
   controllers: [AppController, ProxyController],
   providers: [AppService],
