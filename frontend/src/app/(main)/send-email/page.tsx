@@ -36,6 +36,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { columns } from "./columns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import QrMobileScannerDesktop from "@/components/qr-mobile-scanner/QrMobileScannerDesktop";
 
 interface Student {
   mssv: string;
@@ -58,7 +59,7 @@ export default function SendEmailPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
   const [manualUrl, setManualUrl] = useState("");
-  const [inputMethod, setInputMethod] = useState<"camera" | "scanner" | "manual">("camera");
+  const [inputMethod, setInputMethod] = useState<"camera" | "scanner" | "manual" | "mobile_camera">("camera");
   const [isProcessing, setIsProcessing] = useState(false);
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
@@ -120,63 +121,69 @@ export default function SendEmailPage() {
   ): Promise<Student | null> => {
     if (isProcessing) return null;
     setIsProcessing(true);
-  
+
+    let studentData: Student | null = null;
+
     try {
-      // Fetch student data from the external API
-      const apiUrl = `http://localhost:3001/proxy/student?barcode=${encodeURIComponent(
-        url
-      )}`;
-      const response = await axios.get(apiUrl);
-      const studentData: Student = response.data as Student;
-  
-      // Check if studentCode already exists for the authenticated user's email
-      const checkResponse = await axios.get(
-        `http://localhost:3001/student-cards/check?studentCode=${encodeURIComponent(
-          studentData.mssv
-        )}`,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
-      );
-  
-      if ((checkResponse.data as { exists: boolean }).exists) {
-        toast.info(`Sinh viên ${studentData.ten} đã có trong danh sách của bạn.`);
+      // 1. Fetch student data from the external API
+      const apiUrl = `http://localhost:3001/proxy/student?barcode=${encodeURIComponent(url)}`;
+      const proxyResponse = await axios.get(apiUrl);
+      studentData = proxyResponse.data as Student;
+
+      if (!studentData || !studentData.mssv) {
+        toast.error("Không thể lấy thông tin sinh viên từ mã QR/URL.");
+        setIsProcessing(false);
         return null;
       }
-  
-      // If not a duplicate, add to processedMssvSet and save to StudentCard
+
+      // 2. Add to UI lists if not already processed in this session for UI
       if (processedMssvSet.current.has(studentData.mssv)) {
-        toast.info(`Sinh viên ${studentData.ten} đã được xử lý trong phiên này.`);
-        return null;
+        toast.info(`Sinh viên ${studentData.ten} đã được thêm vào danh sách người nhận trong phiên này.`);
+        // Update recentlyAdded display even if already in set, to show it again
+        setRecentlyAddedStudents((prev) => [studentData!, ...prev.filter(s => s.mssv !== studentData!.mssv).slice(0, 4)]);
+        setCurrentSlide(0);
+        setIsProcessing(false);
+        return studentData; // Return studentData so it can be potentially used by caller
+      } else {
+        setRecipients((prev) => [...prev, studentData!]);
+        setRecentlyAddedStudents((prev) => [studentData!, ...prev.filter(s => s.mssv !== studentData!.mssv).slice(0, 4)]);
+        setCurrentSlide(0);
+        processedMssvSet.current.add(studentData.mssv);
+        toast.success(`Đã thêm ${studentData.ten} vào danh sách người nhận.`);
       }
-  
-      processedMssvSet.current.add(studentData.mssv);
-  
-      // Save to StudentCard
-      const studentCardData = {
-        fullNameNS: studentData.ten,
-        studentCode: studentData.mssv,
-        email: studentData.email,
-        cardCode: url,
-      };
-  
-      await axios.post(
-        "http://localhost:3001/student-cards",
-        studentCardData,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+
+      // 3. Attempt to save to StudentCard database (best effort, backend handles uniqueness)
+      try {
+        const studentCardData = {
+          fullNameNS: studentData.ten,
+          studentCode: studentData.mssv,
+          email: studentData.email,
+          cardCode: url, // Original scanned URL/barcode
+        };
+        await axios.post(
+          "http://localhost:3001/student-cards",
+          studentCardData,
+          {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          }
+        );
+        // Optional: Toast for successful save or update, if backend provides such info.
+        // For now, the primary success toast is for adding to the list.
+        // toast.info(`Thông tin SV ${studentData.ten} đã được lưu/cập nhật vào CSDL của bạn.`);
+      } catch (dbError: any) {
+        if (axios.isAxiosError && axios.isAxiosError(dbError) && dbError.response && dbError.response.status === 409) {
+          toast.info(`Thông tin SV ${studentData.ten} đã tồn tại trong CSDL của bạn.`);
+        } else {
+          console.error("Lỗi khi lưu StudentCard:", dbError);
+          toast.warn(`Lưu ý: Không thể lưu thông tin SV ${studentData.ten} vào CSDL dài hạn của bạn, nhưng vẫn có thể gửi email lần này.`);
         }
-      );
-  
-      // Update recipients and recently added students
-      setRecipients((prev) => [...prev, studentData]);
-      setRecentlyAddedStudents((prev) => [studentData, ...prev.slice(0, 4)]);
-      setCurrentSlide(0);
-      toast.success(`Đã thêm và lưu: ${studentData.ten} - ${studentData.mssv}`);
+      }
+
       return studentData;
+
     } catch (error) {
-      console.error("Lỗi khi lấy hoặc lưu dữ liệu sinh viên:", error);
-      toast.error("Không thể lấy hoặc lưu thông tin sinh viên.");
+      console.error("Lỗi khi lấy thông tin sinh viên từ proxy:", error);
+      toast.error("Không thể lấy thông tin sinh viên từ mã QR/URL đã quét.");
       return null;
     } finally {
       setIsProcessing(false);
@@ -384,6 +391,16 @@ export default function SendEmailPage() {
     );
   };
 
+  // Define the handler for data from the mobile scanner component
+  const handleMobileScannedData = (scannedUrl: string) => {
+    if (scannedUrl) {
+      console.log("Data received from mobile scanner component via callback:", scannedUrl);
+      // Assuming fetchStudentData can handle the URL directly.
+      // The 'true' argument indicates it's from a QR scan, similar to how onScanSuccess uses it.
+      fetchStudentData(scannedUrl, true); 
+    }
+  };
+
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Gửi Email</h1>
@@ -407,6 +424,20 @@ export default function SendEmailPage() {
             onChange={() => setInputMethod("scanner")}
           />
           <span>Dùng máy quét QR</span>
+        </label>
+        <label className="flex items-center space-x-2">
+          <input
+            type="radio"
+            value="mobile_camera"
+            checked={inputMethod === "mobile_camera"}
+            onChange={() => {
+              setInputMethod("mobile_camera");
+              // Optionally, stop other scanners if they were active
+              setIsScanning(false); 
+              setIsScannerActive(false);
+            }}
+          />
+          <span>Quét bằng điện thoại</span>
         </label>
         <label className="flex items-center space-x-2">
           <input
@@ -474,6 +505,12 @@ export default function SendEmailPage() {
                   </Button>
                 </>
               )}
+            </div>
+          )}
+
+          {inputMethod === "mobile_camera" && (
+            <div className="w-full text-center">
+              <QrMobileScannerDesktop onStudentDataScanned={handleMobileScannedData} />
             </div>
           )}
 

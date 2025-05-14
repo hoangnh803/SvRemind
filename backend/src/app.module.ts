@@ -20,6 +20,7 @@ import { TransactionsModule } from './transactions/transactions.module';
 import { SessionModule } from './session/session.module';
 import { StudentCardsModule } from './student-cards/student-cards.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { RealtimeQrModule } from './realtime-qr/realtime-qr.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     SessionModule,
     StudentCardsModule,
     DashboardModule,
+    RealtimeQrModule,
   ],
   controllers: [AppController, ProxyController],
   providers: [AppService],

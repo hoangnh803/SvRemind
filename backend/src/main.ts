@@ -1,9 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 // src/main.ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import * as dotenv from 'dotenv';
-import { WsAdapter } from '@nestjs/platform-ws';
+// import { WsAdapter } from '@nestjs/platform-ws'; // Comment out or remove WsAdapter
+import { IoAdapter } from '@nestjs/platform-socket.io'; // Import IoAdapter
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 dotenv.config(); // Load biến môi trường từ .env
@@ -11,8 +14,15 @@ dotenv.config(); // Load biến môi trường từ .env
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe());
-  app.enableCors();
-  app.useWebSocketAdapter(new WsAdapter(app));
+
+  // Configure main HTTP CORS
+  app.enableCors({
+    origin: 'http://localhost:3000', // Your frontend origin
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+  });
+
+  app.useWebSocketAdapter(new IoAdapter(app.getHttpServer())); // Pass app.getHttpServer()
   const config = new DocumentBuilder()
     .setTitle('SVremind API')
     .setDescription('The API description')
@@ -28,5 +38,7 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
   await app.listen(3001);
+  console.log(`Application is running on: ${await app.getUrl()}`);
+  console.log(`WebSocket server should be available via the same port.`);
 }
 bootstrap();
