@@ -42,29 +42,37 @@ export default function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [error, setError] = useState("");
   const [globalFilter, setGlobalFilter] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const router = useRouter();
-  const token = localStorage.getItem("token");
-  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
 
   useEffect(() => {
-    if (currentUser.role !== "Admin") {
-      router.push("/");
-      return;
-    }
-
-    const fetchRoles = async () => {
-      try {
-        const response = await axios.get("http://localhost:3001/auth/roles", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setRoles(response.data as Role[]);
-      } catch (err) {
-        setError("Lỗi khi lấy danh sách quyền");
+    // Only access localStorage in browser environment
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem("token");
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      
+      if (currentUser.role !== "Admin") {
+        router.push("/");
+        return;
       }
-    };
-    fetchRoles();
-  }, [token, currentUser.role, router]);
+
+      setIsAdmin(true);
+
+      const fetchRoles = async () => {
+        try {
+          const response = await axios.get("http://localhost:3001/auth/roles", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setRoles(response.data as Role[]);
+        } catch (err) {
+          setError("Lỗi khi lấy danh sách quyền");
+        }
+      };
+      
+      fetchRoles();
+    }
+  }, [router]);
 
   const table = useReactTable({
     data: roles,
@@ -86,7 +94,7 @@ export default function RolesPage() {
     columnResizeMode: "onChange",
   });
 
-  if (currentUser.role !== "Admin") return null;
+  if (!isAdmin) return null;
 
   return (
     <div className="p-6">
