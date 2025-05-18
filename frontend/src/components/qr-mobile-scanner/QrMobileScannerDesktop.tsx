@@ -5,12 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { QRCodeCanvas as QRCode } from 'qrcode.react';
 import * as SocketIOClient from 'socket.io-client';
 
-interface ScannedData {
-  // Define the structure of the data you expect to receive
-  // For now, let's assume it's just a string, but you can make it more complex
-  id: string; // Example: student ID
-  timestamp: number;
-}
+
 
 interface QrMobileScannerDesktopProps {
   onStudentDataScanned?: (scannedUrl: string) => void; // New prop for callback
