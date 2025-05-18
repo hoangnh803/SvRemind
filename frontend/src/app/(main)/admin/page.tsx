@@ -120,13 +120,13 @@ export default function AdminDashboard() {
   const totals = React.useMemo(
     () => ({
       system: {
-        users: data.system.users.reduce((acc, curr) => acc + Number(curr.count), 0),
-        emails: data.system.emails.reduce((acc, curr) => acc + Number(curr.count), 0),
-        studentCards: data.system.studentCards.reduce((acc, curr) => acc + Number(curr.count), 0),
+        users: data.system?.users.reduce((acc, curr) => acc + Number(curr.count), 0) || 0,
+        emails: data.system?.emails.reduce((acc, curr) => acc + Number(curr.count), 0) || 0,
+        studentCards: data.system?.studentCards.reduce((acc, curr) => acc + Number(curr.count), 0) || 0,
       },
       personal: {
-        myEmails: data.personal.myEmails.reduce((acc, curr) => acc + Number(curr.count), 0),
-        myStudentCards: data.personal.myStudentCards.reduce((acc, curr) => acc + Number(curr.count), 0),
+        myEmails: data.personal?.myEmails.reduce((acc, curr) => acc + Number(curr.count), 0) || 0,
+        myStudentCards: data.personal?.myStudentCards.reduce((acc, curr) => acc + Number(curr.count), 0) || 0,
       },
     }),
     [data]
@@ -203,7 +203,7 @@ export default function AdminDashboard() {
             <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
               <BarChart
                 accessibilityLayer
-                data={data.system[systemActiveChart]}
+                data={data.system?.[systemActiveChart] || []}
                 margin={{ left: 12, right: 12 }}
               >
                 <CartesianGrid vertical={false} />
@@ -239,7 +239,7 @@ export default function AdminDashboard() {
                 <Bar dataKey="count" fill={`var(--color-${systemActiveChart})`} />
               </BarChart>
             </ChartContainer>
-            {data.system[systemActiveChart].length === 0 && !loading && (
+            {data.system?.[systemActiveChart]?.length === 0 && !loading && (
               <p className="text-center text-gray-500 mt-4">No data available for this time range</p>
             )}
           </CardContent>
@@ -280,7 +280,7 @@ export default function AdminDashboard() {
             <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
               <BarChart
                 accessibilityLayer
-                data={data.personal[personalActiveChart]}
+                data={data.personal?.[personalActiveChart] || []}
                 margin={{ left: 12, right: 12 }}
               >
                 <CartesianGrid vertical={false} />
@@ -316,7 +316,7 @@ export default function AdminDashboard() {
                 <Bar dataKey="count" fill={`var(--color-${personalActiveChart})`} />
               </BarChart>
             </ChartContainer>
-            {data.personal[personalActiveChart].length === 0 && !loading && (
+            {data.personal?.[personalActiveChart]?.length === 0 && !loading && (
               <p className="text-center text-gray-500 mt-4">No data available for this time range</p>
             )}
           </CardContent>
