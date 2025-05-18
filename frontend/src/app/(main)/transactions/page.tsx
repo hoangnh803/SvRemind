@@ -10,6 +10,7 @@ import {
   getPaginationRowModel,
   getFilteredRowModel,
   useReactTable,
+  ColumnDef,
 } from "@tanstack/react-table";
 import {
   Table,
@@ -97,7 +98,7 @@ export default function TransactionsPage() {
 
   const table = useReactTable({
     data: transactions,
-    columns,
+    columns: columns as ColumnDef<Transaction, any>[],
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),

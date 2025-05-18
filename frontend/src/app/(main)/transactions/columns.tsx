@@ -23,7 +23,7 @@ interface Transaction {
   };
 }
 
-export const columns: ColumnDef<Transaction>[] = [
+export const columns: ColumnDef<Transaction, any>[] = [
   {
     accessorKey: "title",
     header: ({ column }) => (
