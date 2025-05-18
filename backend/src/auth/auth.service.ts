@@ -1,7 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 // src/auth/auth.service.ts
 import {
   Injectable,
@@ -56,18 +52,9 @@ export class AuthService {
           },
         ),
       );
-      const result = response.data;
+      const result = parseInt(response.data, 10);
       console.log('ToolHub Result:', result);
-
-      if (result == '1') {
-        return 1;
-      } else if (result == '0') {
-        return 0;
-      } else {
-        throw new InternalServerErrorException(
-          'Lỗi từ hệ thống xác thực ToolHub',
-        );
-      }
+      return result;
     } catch (error) {
       console.error('ToolHub Error:', error);
       throw new InternalServerErrorException(
@@ -89,7 +76,7 @@ export class AuthService {
     const normalizedEmail = email.toLowerCase();
 
     const result = await this.checkHustAccount(normalizedEmail, password);
-    if (result !== 1) {
+    if (result == 0) {
       throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
     }
 
