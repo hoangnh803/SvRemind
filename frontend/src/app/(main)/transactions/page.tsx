@@ -97,7 +97,7 @@ export default function TransactionsPage() {
 
   const table = useReactTable({
     data: transactions,
-    columns,
+    columns: columns as any,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
