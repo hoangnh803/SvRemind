@@ -52,17 +52,22 @@ export default function UsersPage() {
     newRole: string;
   }>({ show: false, message: "", email: "", newRole: "" });
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [currentEmail, setCurrentEmail] = useState('');
 
   const router = useRouter();
-  const token = localStorage.getItem("token");
-  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const currentEmail = currentUser.email;
 
   useEffect(() => {
+    const token = localStorage.getItem("token");
+    const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+    
     if (currentUser.role !== "Admin") {
       router.push("/");
       return;
     }
+
+    setIsAdmin(true);
+    setCurrentEmail(currentUser.email || '');
 
     const fetchUsers = async () => {
       try {
@@ -75,10 +80,11 @@ export default function UsersPage() {
       }
     };
     fetchUsers();
-  }, [token, currentUser.role, router]);
+  }, [router]);
 
   const handleUpdateRole = async (email: string, newRole: string) => {
     try {
+      const token = localStorage.getItem("token");
       await axios.put(
         `http://localhost:3001/auth/users/${email}/role`,
         { role: newRole },
@@ -130,7 +136,7 @@ export default function UsersPage() {
     },
   });
 
-  if (currentUser.role !== "Admin") return null;
+  if (!isAdmin) return null;
 
   return (
     <div className="p-6">

@@ -26,19 +26,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
-
-interface ChartDataPoint {
-  date: string;
-  count: number | string;
-}
+import { dashboardService, ChartDataPoint } from "@/services/api";
 
 interface DashboardData {
-  system: {
+  system?: {
     users: ChartDataPoint[];
     emails: ChartDataPoint[];
     studentCards: ChartDataPoint[];
   };
-  personal: {
+  personal?: {
     myEmails: ChartDataPoint[];
     myStudentCards: ChartDataPoint[];
   };
@@ -77,27 +73,29 @@ const timeRanges = [
 
 export default function AdminDashboard() {
   const [data, setData] = React.useState<DashboardData>({
-    system: { users: [], emails: [], studentCards: [] },
-    personal: { myEmails: [], myStudentCards: [] },
+    system: {
+      users: [],
+      emails: [],
+      studentCards: [],
+    },
+    personal: {
+      myEmails: [],
+      myStudentCards: [],
+    },
   });
+  const [loading, setLoading] = React.useState(true);
   const [timeRange, setTimeRange] = React.useState<string>("90d");
   const [systemActiveChart, setSystemActiveChart] = React.useState<"users" | "emails" | "studentCards">("users");
   const [personalActiveChart, setPersonalActiveChart] = React.useState<"myEmails" | "myStudentCards">("myEmails");
-  const [loading, setLoading] = React.useState<boolean>(true);
   const [role, setRole] = React.useState<string | null>(null);
   const router = useRouter();
 
-  // Check user role from localStorage
   React.useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (!user.role) {
-      router.push("/login");
-    } else if (user.role !== "Admin") {
-      router.push("/dashboard");
-    } else {
-      setRole(user.role);
+    if (typeof window !== 'undefined') {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      setRole(user.role || null);
     }
-  }, [router]);
+  }, []);
 
   // Fetch dashboard data
   React.useEffect(() => {
@@ -106,40 +104,7 @@ export default function AdminDashboard() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-          throw new Error("No authentication token found");
-        }
-        const headers = { Authorization: `Bearer ${token}` };
-
-        const processData = (rawData: any[]): ChartDataPoint[] =>
-          rawData.map((item) => ({
-            date: item.date,
-            count: Number(item.count),
-          })).filter((item) => !isNaN(item.count));
-
-        const [usersResponse, emailsResponse, studentCardsResponse, myEmailsResponse, myStudentCardsResponse] =
-          await Promise.all([
-            axios.get<ChartDataPoint[]>("http://localhost:3001/dashboard/users", { headers, params: { timeRange } }),
-            axios.get<ChartDataPoint[]>("http://localhost:3001/dashboard/emails", { headers, params: { timeRange } }),
-            axios.get<ChartDataPoint[]>("http://localhost:3001/dashboard/student-cards", { headers, params: { timeRange } }),
-            axios.get<ChartDataPoint[]>("http://localhost:3001/dashboard/user/emails", { headers, params: { timeRange } }),
-            axios.get<ChartDataPoint[]>("http://localhost:3001/dashboard/user/student-cards", { headers, params: { timeRange } }),
-          ]);
-
-        const newData = {
-          system: {
-            users: processData(usersResponse.data),
-            emails: processData(emailsResponse.data),
-            studentCards: processData(studentCardsResponse.data),
-          },
-          personal: {
-            myEmails: processData(myEmailsResponse.data),
-            myStudentCards: processData(myStudentCardsResponse.data),
-          },
-        };
-
-        console.log("Processed admin dashboard data:", newData);
+        const newData = await dashboardService.getAdminDashboardData(timeRange);
         setData(newData);
       } catch (error) {
         console.error("Error fetching admin dashboard data:", error);

@@ -33,11 +33,12 @@ export default function TransactionDetailPage() {
   useEffect(() => {
     const fetchTransaction = async () => {
       try {
+        const token = localStorage.getItem("token");
         const response = await axios.get<Transaction>(
           `http://localhost:3001/transactions/${id}`,
           {
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              Authorization: `Bearer ${token}`,
             },
           }
         );
