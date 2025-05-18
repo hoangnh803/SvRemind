@@ -4,6 +4,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
+import axios from "axios";
 import {
   Card,
   CardContent,
@@ -25,15 +26,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
-import { dashboardService, ChartDataPoint } from "@/services/api";
+
+interface ChartDataPoint {
+  date: string;
+  count: number | string;
+}
 
 interface DashboardData {
-  system?: {
+  system: {
     users: ChartDataPoint[];
     emails: ChartDataPoint[];
     studentCards: ChartDataPoint[];
   };
-  personal?: {
+  personal: {
     myEmails: ChartDataPoint[];
     myStudentCards: ChartDataPoint[];
   };
@@ -72,29 +77,27 @@ const timeRanges = [
 
 export default function AdminDashboard() {
   const [data, setData] = React.useState<DashboardData>({
-    system: {
-      users: [],
-      emails: [],
-      studentCards: [],
-    },
-    personal: {
-      myEmails: [],
-      myStudentCards: [],
-    },
+    system: { users: [], emails: [], studentCards: [] },
+    personal: { myEmails: [], myStudentCards: [] },
   });
-  const [loading, setLoading] = React.useState(true);
   const [timeRange, setTimeRange] = React.useState<string>("90d");
   const [systemActiveChart, setSystemActiveChart] = React.useState<"users" | "emails" | "studentCards">("users");
   const [personalActiveChart, setPersonalActiveChart] = React.useState<"myEmails" | "myStudentCards">("myEmails");
+  const [loading, setLoading] = React.useState<boolean>(true);
   const [role, setRole] = React.useState<string | null>(null);
   const router = useRouter();
 
+  // Check user role from localStorage
   React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      setRole(user.role || null);
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    if (!user.role) {
+      router.push("/login");
+    } else if (user.role !== "Admin") {
+      router.push("/dashboard");
+    } else {
+      setRole(user.role);
     }
-  }, []);
+  }, [router]);
 
   // Fetch dashboard data
   React.useEffect(() => {
@@ -103,7 +106,40 @@ export default function AdminDashboard() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const newData = await dashboardService.getAdminDashboardData(timeRange);
+        const token = localStorage.getItem("token");
+        if (!token) {
+          throw new Error("No authentication token found");
+        }
+        const headers = { Authorization: `Bearer ${token}` };
+
+        const processData = (rawData: any[]): ChartDataPoint[] =>
+          rawData.map((item) => ({
+            date: item.date,
+            count: Number(item.count),
+          })).filter((item) => !isNaN(item.count));
+
+        const [usersResponse, emailsResponse, studentCardsResponse, myEmailsResponse, myStudentCardsResponse] =
+          await Promise.all([
+            axios.get<ChartDataPoint[]>("http://localhost:3001/dashboard/users", { headers, params: { timeRange } }),
+            axios.get<ChartDataPoint[]>("http://localhost:3001/dashboard/emails", { headers, params: { timeRange } }),
+            axios.get<ChartDataPoint[]>("http://localhost:3001/dashboard/student-cards", { headers, params: { timeRange } }),
+            axios.get<ChartDataPoint[]>("http://localhost:3001/dashboard/user/emails", { headers, params: { timeRange } }),
+            axios.get<ChartDataPoint[]>("http://localhost:3001/dashboard/user/student-cards", { headers, params: { timeRange } }),
+          ]);
+
+        const newData = {
+          system: {
+            users: processData(usersResponse.data),
+            emails: processData(emailsResponse.data),
+            studentCards: processData(studentCardsResponse.data),
+          },
+          personal: {
+            myEmails: processData(myEmailsResponse.data),
+            myStudentCards: processData(myStudentCardsResponse.data),
+          },
+        };
+
+        console.log("Processed admin dashboard data:", newData);
         setData(newData);
       } catch (error) {
         console.error("Error fetching admin dashboard data:", error);
@@ -120,13 +156,13 @@ export default function AdminDashboard() {
   const totals = React.useMemo(
     () => ({
       system: {
-        users: data.system?.users.reduce((acc, curr) => acc + Number(curr.count), 0) || 0,
-        emails: data.system?.emails.reduce((acc, curr) => acc + Number(curr.count), 0) || 0,
-        studentCards: data.system?.studentCards.reduce((acc, curr) => acc + Number(curr.count), 0) || 0,
+        users: data.system.users.reduce((acc, curr) => acc + Number(curr.count), 0),
+        emails: data.system.emails.reduce((acc, curr) => acc + Number(curr.count), 0),
+        studentCards: data.system.studentCards.reduce((acc, curr) => acc + Number(curr.count), 0),
       },
       personal: {
-        myEmails: data.personal?.myEmails.reduce((acc, curr) => acc + Number(curr.count), 0) || 0,
-        myStudentCards: data.personal?.myStudentCards.reduce((acc, curr) => acc + Number(curr.count), 0) || 0,
+        myEmails: data.personal.myEmails.reduce((acc, curr) => acc + Number(curr.count), 0),
+        myStudentCards: data.personal.myStudentCards.reduce((acc, curr) => acc + Number(curr.count), 0),
       },
     }),
     [data]
@@ -203,7 +239,7 @@ export default function AdminDashboard() {
             <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
               <BarChart
                 accessibilityLayer
-                data={data.system?.[systemActiveChart] || []}
+                data={data.system[systemActiveChart]}
                 margin={{ left: 12, right: 12 }}
               >
                 <CartesianGrid vertical={false} />
@@ -239,7 +275,7 @@ export default function AdminDashboard() {
                 <Bar dataKey="count" fill={`var(--color-${systemActiveChart})`} />
               </BarChart>
             </ChartContainer>
-            {data.system?.[systemActiveChart]?.length === 0 && !loading && (
+            {data.system[systemActiveChart].length === 0 && !loading && (
               <p className="text-center text-gray-500 mt-4">No data available for this time range</p>
             )}
           </CardContent>
@@ -280,7 +316,7 @@ export default function AdminDashboard() {
             <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
               <BarChart
                 accessibilityLayer
-                data={data.personal?.[personalActiveChart] || []}
+                data={data.personal[personalActiveChart]}
                 margin={{ left: 12, right: 12 }}
               >
                 <CartesianGrid vertical={false} />
@@ -316,7 +352,7 @@ export default function AdminDashboard() {
                 <Bar dataKey="count" fill={`var(--color-${personalActiveChart})`} />
               </BarChart>
             </ChartContainer>
-            {data.personal?.[personalActiveChart]?.length === 0 && !loading && (
+            {data.personal[personalActiveChart].length === 0 && !loading && (
               <p className="text-center text-gray-500 mt-4">No data available for this time range</p>
             )}
           </CardContent>

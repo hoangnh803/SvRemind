@@ -10,7 +10,6 @@ import {
   getPaginationRowModel,
   getFilteredRowModel,
   useReactTable,
-  ColumnDef,
 } from "@tanstack/react-table";
 import {
   Table,
@@ -60,12 +59,11 @@ export default function TransactionsPage() {
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
-        const token = localStorage.getItem("token");
         const response = await axios.get<Transaction[]>(
           "http://localhost:3001/transactions",
           {
             headers: {
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
           }
         );
@@ -84,10 +82,9 @@ export default function TransactionsPage() {
     }
 
     try {
-      const token = localStorage.getItem("token");
       await axios.delete(`http://localhost:3001/transactions/${id}`, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
       setTransactions((prev) => prev.filter((transaction) => transaction.id !== id));
@@ -100,7 +97,7 @@ export default function TransactionsPage() {
 
   const table = useReactTable({
     data: transactions,
-    columns: columns as ColumnDef<Transaction, any>[],
+    columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),

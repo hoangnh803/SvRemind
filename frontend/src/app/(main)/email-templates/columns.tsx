@@ -115,7 +115,7 @@ export const columns: ColumnDef<EmailTemplate>[] = [
             </DropdownMenuItem>
             <DropdownMenuItem
               className="text-red-600"
-              onClick={() => handleDeleteTemplate(template)}
+              onClick={() => handleDeleteTemplate(template.id)}
             >
               Xóa
             </DropdownMenuItem>

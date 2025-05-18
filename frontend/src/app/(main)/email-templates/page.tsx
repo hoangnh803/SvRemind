@@ -58,6 +58,7 @@ export default function EmailTemplatePage() {
             },
           }
         );
+        
         setTemplates(response.data);
       } catch (error) {
         console.error("Lỗi khi lấy danh sách template:", error);
@@ -134,6 +135,7 @@ export default function EmailTemplatePage() {
   };
 
   const handleDeleteTemplate = async (id: string) => {
+    console.log(id);
     if (confirm("Bạn có chắc chắn muốn xóa template này?")) {
       try {
         await axios.delete(`http://localhost:3001/email-templates/${id}`, {

@@ -42,19 +42,16 @@ export default function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [error, setError] = useState("");
   const [globalFilter, setGlobalFilter] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
+
   const router = useRouter();
+  const token = localStorage.getItem("token");
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-
     if (currentUser.role !== "Admin") {
       router.push("/");
       return;
     }
-
-    setIsAdmin(true);
 
     const fetchRoles = async () => {
       try {
@@ -67,7 +64,7 @@ export default function RolesPage() {
       }
     };
     fetchRoles();
-  }, [router]);
+  }, [token, currentUser.role, router]);
 
   const table = useReactTable({
     data: roles,
@@ -89,7 +86,7 @@ export default function RolesPage() {
     columnResizeMode: "onChange",
   });
 
-  if (!isAdmin) return null;
+  if (currentUser.role !== "Admin") return null;
 
   return (
     <div className="p-6">
