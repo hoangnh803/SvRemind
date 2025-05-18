@@ -171,7 +171,7 @@ export default function SendEmailPage() {
         // For now, the primary success toast is for adding to the list.
         // toast.info(`Thông tin SV ${studentData.ten} đã được lưu/cập nhật vào CSDL của bạn.`);
       } catch (dbError: any) {
-        if (axios.isAxiosError && axios.isAxiosError(dbError) && dbError.response && dbError.response.status === 409) {
+        if (dbError.response?.status === 409) {
           toast.info(`Thông tin SV ${studentData.ten} đã tồn tại trong CSDL của bạn.`);
         } else {
           console.error("Lỗi khi lưu StudentCard:", dbError);
