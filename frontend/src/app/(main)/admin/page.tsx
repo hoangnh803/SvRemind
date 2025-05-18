@@ -4,7 +4,6 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
-import axios from "axios";
 import {
   Card,
   CardContent,
