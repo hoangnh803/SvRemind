@@ -24,7 +24,8 @@ interface SendStudentQrDataPayload {
 
 @WebSocketGateway({
   cors: {
-    origin: 'http://localhost:3000', // Explicitly allow frontend origin
+    origin:
+      'https://sv-remind-5stumm724-hoangqaz125-gmailcoms-projects.vercel.app/', // Explicitly allow frontend origin
     methods: ['GET', 'POST'],
     credentials: true,
   },
