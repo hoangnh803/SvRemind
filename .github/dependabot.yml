@@ -1,0 +1,11 @@
+# File: .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/frontend" # Frontend (NextJS)
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "npm"
+    directory: "/backend" # Backend (NestJS)
+    schedule:
+      interval: "weekly"
