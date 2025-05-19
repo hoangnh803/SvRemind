@@ -95,7 +95,7 @@ export default function SendEmailPage() {
       stream.getTracks().forEach((track) => track.stop());
       const scanner = new Html5QrcodeScanner(
         "qr-reader",
-        { fps: 10, showZoomSliderIfSupported: true, defaultZoomValueIfSupported: 2 },
+        { fps: 10, showZoomSliderIfSupported: true, defaultZoomValueIfSupported: 4 },
         false
       );
       scanner.render(onScanSuccess, onScanFailure);
