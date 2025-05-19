@@ -1,3 +1,4 @@
+# File: .github/workflows/node.js.yml
 name: SvRemind CI/CD
 
 on:
@@ -65,22 +66,8 @@ jobs:
           name: build-backend
           path: backend/dist_folder
 
-      - name: Set up SSH
-        uses: webfactory/ssh-agent@v0.5.2
-        with:
-          ssh-private-key: ${{ secrets.SERVER_SECRET_KEY }}
-          script: |
-            ssh-add -D
-            ssh-add ${{ secrets.SERVER_SECRET_KEY }}
-            ssh-keyscan -t rsa ${{ secrets.HOST }} >> ~/.ssh/known_hosts
-            chmod 644 ~/.ssh/known_hosts
-
-      - name: Deploy Frontend
+      # WSL deployment: Manual step (since SSH is not needed)
+      - name: Deploy to WSL
         run: |
-          ssh -o StrictHostKeyChecking=no -p ${{ secrets.PORT }} ${{ secrets.USERNAME }}@${{ secrets.HOST }} "cd /var/www/svremind/frontend && rm -rf ./**"
-          scp -o StrictHostKeyChecking=no -P ${{ secrets.PORT }} -r frontend/out/* ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/var/www/svremind/frontend
-
-      - name: Deploy Backend
-        run: |
-          scp -o StrictHostKeyChecking=no -P ${{ secrets.PORT }} -r backend/dist_folder/* ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/var/www/svremind/backend
-          ssh -o StrictHostKeyChecking=no -p ${{ secrets.PORT }} ${{ secrets.USERNAME }}@${{ secrets.HOST }} "cd /var/www/svremind/backend && yarn install && pm2 stop svremind-backend && pm2 start svremind-backend"
+          echo "Artifacts are ready for deployment to WSL."
+          echo "Manually copy artifacts to WSL and run deployment commands."
