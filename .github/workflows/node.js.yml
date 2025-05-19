@@ -66,10 +66,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-frontend
-          path: 
-            - frontend/.next
-            - frontend/package.json
-            - frontend/public
+          path: frontend/.next
+
 
   deploy:
     needs: build
@@ -80,10 +78,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-frontend
-            path: 
-            - frontend/.next
-            - frontend/package.json
-            - frontend/public
+          path: frontend/.next
 
       - name: Download Backend artifacts
         uses: actions/download-artifact@v4
