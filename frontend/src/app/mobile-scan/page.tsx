@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Html5QrcodeScanner, Html5QrcodeResult } from 'html5-qrcode';
 import * as SocketIOClient from 'socket.io-client';
 
-const MobileScanPage = () => {
+// Create a client component that uses useSearchParams
+const MobileScanContent = () => {
   const searchParams = useSearchParams();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<string | null>(null);
@@ -161,6 +162,23 @@ const MobileScanPage = () => {
       )}
       {!sessionId && <p>Please ensure you accessed this page by scanning the QR code from the desktop application.</p>}
     </div>
+  );
+};
+
+// Loading fallback component
+const MobileScanLoading = () => (
+  <div style={{ padding: '20px', textAlign: 'center' }}>
+    <h1>Mobile QR Code Scanner</h1>
+    <p>Loading scanner...</p>
+  </div>
+);
+
+// Main page component that wraps the content in a Suspense boundary
+const MobileScanPage = () => {
+  return (
+    <Suspense fallback={<MobileScanLoading />}>
+      <MobileScanContent />
+    </Suspense>
   );
 };
 
