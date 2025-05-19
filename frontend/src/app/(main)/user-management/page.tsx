@@ -52,17 +52,36 @@ export default function UsersPage() {
     newRole: string;
   }>({ show: false, message: "", email: "", newRole: "" });
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [token, setToken] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>({});
+  const [currentEmail, setCurrentEmail] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(true);
 
   const router = useRouter();
-  const token = localStorage.getItem("token");
-  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const currentEmail = currentUser.email;
+
+  // Get auth data from localStorage only on client side
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedToken = localStorage.getItem("token");
+      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      
+      setToken(storedToken);
+      setCurrentUser(storedUser);
+      setCurrentEmail(storedUser.email || "");
+      
+      // Redirect if not admin
+      if (storedUser.role !== "Admin") {
+        router.push("/");
+        return;
+      }
+      
+      setIsLoading(false);
+    }
+  }, [router]);
 
   useEffect(() => {
-    if (currentUser.role !== "Admin") {
-      router.push("/");
-      return;
-    }
+    // Only fetch users when we have token and the user is admin
+    if (!token || currentUser.role !== "Admin" || isLoading) return;
 
     const fetchUsers = async () => {
       try {
@@ -75,7 +94,7 @@ export default function UsersPage() {
       }
     };
     fetchUsers();
-  }, [token, currentUser.role, router]);
+  }, [token, currentUser.role, isLoading]);
 
   const handleUpdateRole = async (email: string, newRole: string) => {
     try {
@@ -130,6 +149,10 @@ export default function UsersPage() {
     },
   });
 
+  // Show loading or nothing if still checking authentication
+  if (isLoading) return null;
+  
+  // If we've checked and not Admin, return nothing
   if (currentUser.role !== "Admin") return null;
 
   return (

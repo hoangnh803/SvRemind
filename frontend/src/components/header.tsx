@@ -9,17 +9,22 @@ export default function Header() {
   const [userEmail, setUserEmail] = useState('My Name');
 
   useEffect(() => {
-    const user = localStorage.getItem('user');
-    if (user) {
-      setUserEmail(JSON.parse(user).email);
+    // Only access localStorage on the client side
+    if (typeof window !== 'undefined') {
+      const user = localStorage.getItem('user');
+      if (user) {
+        setUserEmail(JSON.parse(user).email);
+      }
     }
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    deleteCookie('token');
-    router.push('/login');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      deleteCookie('token');
+      router.push('/login');
+    }
   };
 
   return (

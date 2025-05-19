@@ -30,8 +30,11 @@ export default function SidebarComponent() {
   const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    setRole(user.role);
+    // Only access localStorage on the client side
+    if (typeof window !== 'undefined') {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      setRole(user.role);
+    }
   }, []);
 
   return (

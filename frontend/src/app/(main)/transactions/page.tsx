@@ -54,16 +54,26 @@ interface Transaction {
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const [token, setToken] = useState<string | null>(null);
   const router = useRouter();
 
+  // Get token from localStorage on client side only
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setToken(localStorage.getItem("token"));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!token) return; // Don't fetch if token isn't loaded yet
+
     const fetchTransactions = async () => {
       try {
         const response = await axios.get<Transaction[]>(
           "http://localhost:3001/transactions",
           {
             headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              Authorization: `Bearer ${token}`,
             },
           }
         );
@@ -74,9 +84,10 @@ export default function TransactionsPage() {
       }
     };
     fetchTransactions();
-  }, []);
+  }, [token]);
 
   const handleDeleteTransaction = async (id: number) => {
+    if (!token) return;
     if (!confirm("Bạn có chắc chắn muốn xóa transaction này?")) {
       return;
     }
@@ -84,7 +95,7 @@ export default function TransactionsPage() {
     try {
       await axios.delete(`http://localhost:3001/transactions/${id}`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${token}`,
         },
       });
       setTransactions((prev) => prev.filter((transaction) => transaction.id !== id));
