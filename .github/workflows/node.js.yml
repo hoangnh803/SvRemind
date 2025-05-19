@@ -21,33 +21,52 @@ jobs:
         run: npm install -g yarn
 
       # Build Backend (NestJS)
+      - name: Remove package-lock.json (Backend)
+        run: |
+          rm -f backend/package-lock.json
       - name: Install Dependencies Backend
         run: |
           cd backend
           yarn install
           yarn build
+      - name: Create .env file for Backend
+        run: |
+          cd backend
+          echo "DB_HOST=localhost" > .env
+          echo "DB_PORT=5432" >> .env
+          echo "DB_USERNAME=postgres" >> .env
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+          echo "DB_DATABASE=hust_reminder" >> .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+          echo "MAIL_HOST=smtp.gmail.com" >> .env
+          echo "MAIL_PORT=587" >> .env
+          echo "MAIL_USER=hoangqaz125@gmail.com" >> .env
+          echo "MAIL_PASS=${{ secrets.MAIL_PASS }}" >> .env
       - name: Copy Backend files
         run: |
           cd backend
           mkdir ./dist_folder
           cp -rf ./dist ./.env ./package.json ./dist_folder
       - name: Upload Backend artifacts
-        uses: actions/upload-artifact@v4  # Updated to v4
+        uses: actions/upload-artifact@v4
         with:
           name: build-backend
           path: backend/dist_folder
 
       # Build Frontend (NextJS)
+      - name: Remove package-lock.json (Frontend)
+        run: |
+          rm -f frontend/package-lock.json
       - name: Install Dependencies and Build Frontend
         run: |
           cd frontend
           yarn install
           yarn build
       - name: Upload Frontend artifacts
-        uses: actions/upload-artifact@v4  # Updated to v4
+        uses: actions/upload-artifact@v4
         with:
           name: build-frontend
-          path: frontend/out  # NextJS build output directory (adjust if using a different output dir)
+          path: frontend/out
 
   deploy:
     needs: build
@@ -55,18 +74,17 @@ jobs:
 
     steps:
       - name: Download Frontend artifacts
-        uses: actions/download-artifact@v4  # Ensure download-artifact is also updated to v4
+        uses: actions/download-artifact@v4
         with:
           name: build-frontend
           path: frontend/out
 
       - name: Download Backend artifacts
-        uses: actions/download-artifact@v4  # Updated to v4
+        uses: actions/download-artifact@v4
         with:
           name: build-backend
           path: backend/dist_folder
 
-      # WSL deployment: Manual step (since SSH is not needed)
       - name: Deploy to WSL
         run: |
           echo "Artifacts are ready for deployment to WSL."
