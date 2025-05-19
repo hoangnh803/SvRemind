@@ -90,6 +90,8 @@ const MobileScanContent = () => {
                 },
                 rememberLastUsedCamera: true,
                 supportedScanTypes: [], // Use default (camera)
+                showZoomSliderIfSupported: true,
+                defaultZoomValueIfSupported: 2
             },
             /* verbose= */ false,
         );

@@ -21,7 +21,8 @@ export class RealtimeQrController {
     // IMPORTANT: Replace 'http://localhost:3000' with your actual frontend URL
     // This URL will be embedded in the QR code shown on the desktop.
     // The frontend will have a route like /mobile-scan that handles this.
-    const frontendBaseUrl = process.env.FRONTEND_URL || 'http://localhost:3000'; // Default for local dev
+    const frontendBaseUrl =
+      process.env.FRONTEND_URL || 'https://sv-remind.vercel.app'; // Default for local dev
     const mobileScanUrl = `${frontendBaseUrl}/mobile-scan?sessionId=${sessionId}`;
 
     this.logger.log(
