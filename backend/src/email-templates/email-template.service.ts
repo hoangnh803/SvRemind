@@ -7,10 +7,11 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, ILike } from 'typeorm';
 import { EmailTemplate } from './entities/email-template.entity';
 import { User } from '../users/entities/user.entity';
 import { CreateEmailTemplateDto } from './dto/create-email-template.dto';
+import { PaginatedResponseDto } from './dto/pagination.dto';
 
 @Injectable()
 export class EmailTemplateService {
@@ -64,6 +65,87 @@ export class EmailTemplateService {
       where: { user: { id: userId } },
       relations: ['user'],
     });
+  }
+
+  // Lấy danh sách template của user có phân trang
+  async findByUserPaginated(
+    userId: number,
+    page = 1,
+    limit = 10,
+    search?: string,
+  ): Promise<PaginatedResponseDto<EmailTemplate>> {
+    const skip = (page - 1) * limit;
+
+    const whereCondition: any = { user: { id: userId } };
+
+    // Thêm điều kiện tìm kiếm nếu có
+    if (search) {
+      whereCondition.name = ILike(`%${search}%`);
+
+      // Sử dụng OR để tìm kiếm trong nhiều trường
+      return this.findByUserPaginatedWithSearch(userId, page, limit, search);
+    }
+
+    const [data, totalItems] = await this.emailTemplateRepository.findAndCount({
+      where: whereCondition,
+      relations: ['user'],
+      skip,
+      take: limit,
+      order: { id: 'DESC' },
+    });
+
+    const totalPages = Math.ceil(totalItems / limit);
+
+    return {
+      data,
+      meta: {
+        totalItems,
+        itemCount: data.length,
+        itemsPerPage: limit,
+        totalPages,
+        currentPage: page,
+      },
+    };
+  }
+
+  // Phương thức tìm kiếm nâng cao hơn, sử dụng queryBuilder
+  private async findByUserPaginatedWithSearch(
+    userId: number,
+    page = 1,
+    limit = 10,
+    search: string,
+  ): Promise<PaginatedResponseDto<EmailTemplate>> {
+    const skip = (page - 1) * limit;
+
+    const queryBuilder =
+      this.emailTemplateRepository.createQueryBuilder('template');
+
+    // Join với user để filter theo user_id
+    queryBuilder
+      .leftJoinAndSelect('template.user', 'user')
+      .where('user.id = :userId', { userId })
+      .andWhere(
+        '(template.name ILIKE :search OR template.title ILIKE :search OR template.body ILIKE :search)',
+        { search: `%${search}%` },
+      )
+      .orderBy('template.id', 'DESC')
+      .skip(skip)
+      .take(limit);
+
+    const [data, totalItems] = await queryBuilder.getManyAndCount();
+
+    const totalPages = Math.ceil(totalItems / limit);
+
+    return {
+      data,
+      meta: {
+        totalItems,
+        itemCount: data.length,
+        itemsPerPage: limit,
+        totalPages,
+        currentPage: page,
+      },
+    };
   }
 
   // Lấy một template theo ID

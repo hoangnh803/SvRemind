@@ -74,7 +74,7 @@ export default function SendEmailPage() {
   const fetchTemplates = async () => {
     try {
       const response = await axios.get<EmailTemplate[]>(
-        "http://localhost:3001/email-templates",
+        "http://localhost:3001/email-templates/all",
         {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }
@@ -485,6 +485,11 @@ export default function SendEmailPage() {
                     setScannerInput("");
                   }
                 }}
+                onBlur={() => {
+                  // Reset scanner state when input loses focus
+                  setIsScannerActive(false);
+                  setScannerInput("");
+                }}
                 className="absolute opacity-0 w-0 h-0"
               />
               {!isScannerActive ? (
@@ -499,7 +504,10 @@ export default function SendEmailPage() {
                   <p className="text-gray-600 mb-4">Đang chờ dữ liệu từ máy quét...</p>
                   <Button
                     variant="destructive"
-                    onClick={() => setIsScannerActive(false)}
+                    onClick={() => {
+                      setIsScannerActive(false);
+                      setScannerInput("");
+                    }}
                   >
                     Dừng quét
                   </Button>

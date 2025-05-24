@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { QRCodeCanvas as QRCode } from 'qrcode.react';
 import * as SocketIOClient from 'socket.io-client';
+import { Button } from '../ui/button';
 
 
 
@@ -109,9 +110,9 @@ const QrMobileScannerDesktop: React.FC<QrMobileScannerDesktopProps> = ({ onStude
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h2>Scan Student QR with Mobile Phone</h2>
       {!sessionId && (
-        <button onClick={initializeSession} disabled={isLoading} style={{ padding: '10px 15px', fontSize: '16px' }}>
+        <Button onClick={initializeSession} disabled={isLoading} style={{ padding: '10px 15px', fontSize: '16px' }}>
           {isLoading ? 'Initializing...' : 'Start Mobile Scan Session'}
-        </button>
+        </Button>
       )}
 
       {error && <p style={{ color: 'red' }}>Error: {error}</p>}
@@ -124,7 +125,7 @@ const QrMobileScannerDesktop: React.FC<QrMobileScannerDesktopProps> = ({ onStude
         <div style={{ marginTop: '20px', border: '1px solid #ccc', padding: '20px' }}>
           <h3>1. Scan this QR Code with your Mobile Phone:</h3>
           <p>This will open a special scanning page on your phone.</p>
-          <div style={{ margin: '20px 0'}}>
+          <div style={{ margin: '20px 0', display: 'flex', justifyContent: 'center' }}>
             <QRCode value={mobileScanUrl} size={256} level="H" />
           </div>
           <p>URL: <a href={mobileScanUrl} target="_blank" rel="noopener noreferrer">{mobileScanUrl}</a></p>

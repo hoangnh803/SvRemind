@@ -1,5 +1,13 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { Controller, Get, Param, NotFoundException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  NotFoundException,
+  Query,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UserDto } from './dto/user.dto';
 import {
@@ -8,7 +16,12 @@ import {
   ApiResponse,
   ApiParam,
   ApiNotFoundResponse,
+  ApiQuery,
 } from '@nestjs/swagger';
+import {
+  PaginatedUserResponseDto,
+  UserPaginationQueryDto,
+} from './dto/pagination.dto';
 
 /**
  * Controller xử lý các endpoint liên quan đến người dùng
@@ -31,6 +44,30 @@ export class UsersController {
   })
   async findAll(): Promise<UserDto[]> {
     return this.usersService.findAll();
+  }
+
+  /**
+   * Lấy danh sách người dùng có phân trang và tìm kiếm
+   * @returns Danh sách người dùng có phân trang
+   */
+  @Get('paginated')
+  @ApiOperation({
+    summary: 'Lấy danh sách người dùng có phân trang và tìm kiếm',
+  })
+  @ApiQuery({ type: UserPaginationQueryDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Danh sách người dùng có phân trang',
+    type: PaginatedUserResponseDto,
+  })
+  async findAllPaginated(
+    @Query() paginationQuery: UserPaginationQueryDto,
+  ): Promise<PaginatedUserResponseDto> {
+    return await this.usersService.findAllPaginated(
+      paginationQuery.page,
+      paginationQuery.limit,
+      paginationQuery.search,
+    );
   }
 
   /**

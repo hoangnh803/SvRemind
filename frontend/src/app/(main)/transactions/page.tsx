@@ -7,8 +7,6 @@ import {
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
-  getPaginationRowModel,
-  getFilteredRowModel,
   useReactTable,
 } from "@tanstack/react-table";
 import {
@@ -32,6 +30,7 @@ import { columns } from "./columns";
 import { useRouter } from "next/navigation";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface Transaction {
   id: number;
@@ -51,9 +50,26 @@ interface Transaction {
   };
 }
 
+interface PaginatedTransactionsResponse {
+  data: Transaction[];
+  meta: {
+    totalItems: number;
+    itemCount: number;
+    itemsPerPage: number;
+    totalPages: number;
+    currentPage: number;
+  };
+}
+
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [globalFilter, setGlobalFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [isLoading, setIsLoading] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const router = useRouter();
 
@@ -64,27 +80,38 @@ export default function TransactionsPage() {
     }
   }, []);
 
+  const fetchTransactions = async (page: number, size: number, query = "") => {
+    if (!token) return; // Don't fetch if token isn't loaded yet
+    
+    setIsLoading(true);
+    try {
+      const response = await axios.get<PaginatedTransactionsResponse>(
+        `http://localhost:3001/transactions/paginated?page=${page + 1}&limit=${size}${
+          query ? `&search=${encodeURIComponent(query)}` : ""
+        }`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      
+      setTransactions(response.data.data);
+      setTotalPages(response.data.meta.totalPages);
+      setTotalItems(response.data.meta.totalItems);
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách transaction:", error);
+      toast.error("Không thể tải danh sách transaction");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!token) return; // Don't fetch if token isn't loaded yet
 
-    const fetchTransactions = async () => {
-      try {
-        const response = await axios.get<Transaction[]>(
-          "http://localhost:3001/transactions",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-        setTransactions(response.data);
-      } catch (error) {
-        console.error("Lỗi khi lấy danh sách transaction:", error);
-        toast.error("Không thể tải danh sách transaction");
-      }
-    };
-    fetchTransactions();
-  }, [token]);
+    fetchTransactions(pageIndex, pageSize, debouncedSearchQuery);
+  }, [token, pageIndex, pageSize, debouncedSearchQuery]);
 
   const handleDeleteTransaction = async (id: number) => {
     if (!token) return;
@@ -98,7 +125,9 @@ export default function TransactionsPage() {
           Authorization: `Bearer ${token}`,
         },
       });
-      setTransactions((prev) => prev.filter((transaction) => transaction.id !== id));
+      
+      // Refresh transactions after delete
+      fetchTransactions(pageIndex, pageSize, debouncedSearchQuery);
       toast.success("Transaction đã được xóa thành công");
     } catch (error: any) {
       console.error("Lỗi khi xóa transaction:", error);
@@ -106,24 +135,38 @@ export default function TransactionsPage() {
     }
   };
 
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    // Reset to first page when searching
+    setPageIndex(0);
+  };
+
   const table = useReactTable({
     data: transactions,
     columns: columns as any,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onGlobalFilterChange: setGlobalFilter,
-    globalFilterFn: "includesString",
-    state: {
-      globalFilter,
+    manualPagination: true,
+    pageCount: totalPages,
+    onPaginationChange: (updater) => {
+      if (typeof updater === 'function') {
+        const newPagination = updater({
+          pageIndex,
+          pageSize,
+        });
+        setPageIndex(newPagination.pageIndex);
+        setPageSize(newPagination.pageSize);
+      } else {
+        setPageIndex(updater.pageIndex);
+        setPageSize(updater.pageSize);
+      }
     },
-    initialState: {
+    state: {
       pagination: {
-        pageSize: 10,
+        pageIndex,
+        pageSize,
       },
     },
-    columnResizeMode: "onChange",
     meta: {
       handleDeleteTransaction,
     },
@@ -135,9 +178,9 @@ export default function TransactionsPage() {
 
       <div className="flex justify-end mb-4">
         <Input
-          placeholder="Tìm kiếm theo tiêu đề hoặc nội dung..."
-          value={globalFilter ?? ""}
-          onChange={(event) => setGlobalFilter(event.target.value)}
+          placeholder="Tìm kiếm theo tiêu đề, nội dung, người gửi hoặc người nhận..."
+          value={searchQuery}
+          onChange={handleSearchChange}
           className="max-w-sm"
         />
       </div>
@@ -164,7 +207,13 @@ export default function TransactionsPage() {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  Đang tải...
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
@@ -202,7 +251,7 @@ export default function TransactionsPage() {
             variant="outline"
             size="sm"
             onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
+            disabled={!table.getCanPreviousPage() || isLoading}
           >
             Trang trước
           </Button>
@@ -210,7 +259,7 @@ export default function TransactionsPage() {
             variant="outline"
             size="sm"
             onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
+            disabled={!table.getCanNextPage() || isLoading}
           >
             Trang sau
           </Button>
@@ -219,23 +268,24 @@ export default function TransactionsPage() {
           <span>
             Trang{" "}
             <strong>
-              {table.getState().pagination.pageIndex + 1} /{" "}
-              {table.getPageCount()}
-            </strong>
+              {pageIndex + 1} / {Math.max(1, totalPages)}
+            </strong>{" "}
+            ({totalItems} kết quả)
           </span>
           <Select
-            value={table.getState().pagination.pageSize.toString()}
+            value={pageSize.toString()}
             onValueChange={(value) => {
               table.setPageSize(Number(value));
             }}
+            disabled={isLoading}
           >
             <SelectTrigger className="w-[100px]">
               <SelectValue placeholder="Chọn số hàng" />
             </SelectTrigger>
             <SelectContent>
-              {[5, 10, 20, 30, 50].map((pageSize) => (
-                <SelectItem key={pageSize} value={pageSize.toString()}>
-                  {pageSize} hàng
+              {[5, 10, 20, 30, 50].map((size) => (
+                <SelectItem key={size} value={size.toString()}>
+                  {size} hàng
                 </SelectItem>
               ))}
             </SelectContent>

@@ -6,6 +6,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Transaction } from './entities/transaction.entity';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { PaginatedResponseDto } from './dto/pagination.dto';
 import { User } from '../users/entities/user.entity';
 import { EmailTemplate } from '../email-templates/entities/email-template.entity';
 
@@ -61,6 +62,46 @@ export class TransactionsService {
     return this.transactionsRepository.find({
       relations: ['emailTemplate', 'user'],
     });
+  }
+
+  async findAllPaginated(
+    page = 1,
+    limit = 10,
+    search?: string,
+  ): Promise<PaginatedResponseDto<Transaction>> {
+    const skip = (page - 1) * limit;
+
+    let queryBuilder = this.transactionsRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.emailTemplate', 'emailTemplate')
+      .leftJoinAndSelect('transaction.user', 'user');
+
+    // Add search functionality
+    if (search) {
+      queryBuilder = queryBuilder.where(
+        '(transaction.title ILIKE :search OR transaction.body ILIKE :search OR transaction.sender ILIKE :search OR transaction.receivers ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    const [transactions, totalItems] = await queryBuilder
+      .orderBy('transaction.id', 'DESC')
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    const totalPages = Math.ceil(totalItems / limit);
+
+    return {
+      data: transactions,
+      meta: {
+        totalItems,
+        itemCount: transactions.length,
+        itemsPerPage: limit,
+        totalPages,
+        currentPage: page,
+      },
+    };
   }
 
   async findOne(id: number): Promise<Transaction | null> {

@@ -11,6 +11,7 @@ import {
   UnauthorizedException,
   NotFoundException,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -24,8 +25,13 @@ import {
   ApiBadRequestResponse,
   ApiUnauthorizedResponse,
   ApiNotFoundResponse,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { Transaction } from './entities/transaction.entity';
+import {
+  PaginatedTransactionResponseDto,
+  TransactionPaginationQueryDto,
+} from './dto/pagination.dto';
 
 /**
  * Controller xử lý các endpoint liên quan đến giao dịch email
@@ -90,7 +96,9 @@ export class TransactionsController {
    * @returns Danh sách giao dịch
    */
   @Get()
-  @ApiOperation({ summary: 'Lấy danh sách tất cả giao dịch' })
+  @ApiOperation({
+    summary: 'Lấy danh sách tất cả giao dịch (không phân trang)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Danh sách giao dịch',
@@ -98,6 +106,30 @@ export class TransactionsController {
   })
   findAll() {
     return this.transactionsService.findAll();
+  }
+
+  /**
+   * Lấy danh sách giao dịch có phân trang và tìm kiếm
+   * @returns Danh sách giao dịch có phân trang
+   */
+  @Get('paginated')
+  @ApiOperation({
+    summary: 'Lấy danh sách giao dịch có phân trang và tìm kiếm',
+  })
+  @ApiQuery({ type: TransactionPaginationQueryDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Danh sách giao dịch có phân trang',
+    type: PaginatedTransactionResponseDto,
+  })
+  async findAllPaginated(
+    @Query() paginationQuery: TransactionPaginationQueryDto,
+  ): Promise<PaginatedTransactionResponseDto> {
+    return await this.transactionsService.findAllPaginated(
+      paginationQuery.page,
+      paginationQuery.limit,
+      paginationQuery.search,
+    );
   }
 
   /**

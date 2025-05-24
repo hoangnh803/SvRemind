@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
@@ -10,6 +11,7 @@ import {
   Param,
   Request,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { EmailTemplateService } from './email-template.service';
 import { EmailTemplate } from './entities/email-template.entity';
@@ -22,7 +24,12 @@ import {
   ApiBody,
   ApiBearerAuth,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
+import {
+  PaginatedEmailTemplateResponseDto,
+  PaginationQueryDto,
+} from './dto/pagination.dto';
 
 @ApiTags('email-templates')
 @Controller('email-templates')
@@ -50,14 +57,39 @@ export class EmailTemplateController {
 
   @Get()
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Lấy danh sách mẫu email của người dùng' })
+  @ApiOperation({
+    summary:
+      'Lấy danh sách mẫu email của người dùng (có phân trang và tìm kiếm)',
+  })
+  @ApiQuery({ type: PaginationQueryDto })
   @ApiResponse({
     status: 200,
-    description: 'Danh sách mẫu email',
+    description: 'Danh sách mẫu email có phân trang',
+    type: PaginatedEmailTemplateResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Chưa xác thực' })
+  findByUser(@Request() req, @Query() paginationQuery: PaginationQueryDto) {
+    const userId = req.user.id;
+    return this.emailTemplateService.findByUserPaginated(
+      userId,
+      paginationQuery.page,
+      paginationQuery.limit,
+      paginationQuery.search,
+    );
+  }
+
+  @Get('all')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Lấy tất cả mẫu email của người dùng (không phân trang)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Danh sách tất cả mẫu email',
     type: [EmailTemplate],
   })
   @ApiResponse({ status: 401, description: 'Chưa xác thực' })
-  findByUser(@Request() req): Promise<EmailTemplate[]> {
+  findAllByUser(@Request() req): Promise<EmailTemplate[]> {
     const userId = req.user.id;
     return this.emailTemplateService.findByUser(userId);
   }

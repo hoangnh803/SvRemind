@@ -17,7 +17,7 @@ async function bootstrap() {
 
   // Configure main HTTP CORS
   app.enableCors({
-    origin: 'https://sv-remind.vercel.app', // Your frontend origin
+    origin: 'http://localhost:3000', // Your frontend origin
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });

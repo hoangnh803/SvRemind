@@ -8,8 +8,6 @@ import {
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
-  getPaginationRowModel,
-  getFilteredRowModel,
   useReactTable,
 } from "@tanstack/react-table";
 import {
@@ -30,12 +28,24 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { columns } from "./columns";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface EmailTemplate {
   id: string;
   name: string;
   title: string;
   body: string;
+}
+
+interface PaginatedResponse {
+  data: EmailTemplate[];
+  meta: {
+    totalItems: number;
+    itemCount: number;
+    itemsPerPage: number;
+    totalPages: number;
+    currentPage: number;
+  };
 }
 
 export default function EmailTemplatePage() {
@@ -45,27 +55,41 @@ export default function EmailTemplatePage() {
     null
   );
   const [formData, setFormData] = useState({ name: "", title: "", body: "" });
-  const [globalFilter, setGlobalFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchTemplates = async (page: number, size: number, query = "") => {
+    setIsLoading(true);
+    try {
+      const response = await axios.get<PaginatedResponse>(
+        `http://localhost:3001/email-templates?page=${page + 1}&limit=${size}${
+          query ? `&search=${encodeURIComponent(query)}` : ""
+        }`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+      
+      setTemplates(response.data.data);
+      setTotalPages(response.data.meta.totalPages);
+      setTotalItems(response.data.meta.totalItems);
+    } catch (error) {
+      console.error("Lỗi khi lấy danh sách template:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchTemplates = async () => {
-      try {
-        const response = await axios.get<EmailTemplate[]>(
-          "http://localhost:3001/email-templates",
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          }
-        );
-        
-        setTemplates(response.data);
-      } catch (error) {
-        console.error("Lỗi khi lấy danh sách template:", error);
-      }
-    };
-    fetchTemplates();
-  }, []);
+    fetchTemplates(pageIndex, pageSize, debouncedSearchQuery);
+  }, [pageIndex, pageSize, debouncedSearchQuery]);
 
   const handleCreateTemplate = () => {
     setCurrentTemplate(null);
@@ -99,7 +123,7 @@ export default function EmailTemplatePage() {
     }
     try {
       if (currentTemplate) {
-        const response = await axios.put(
+        await axios.put(
           `http://localhost:3001/email-templates/${currentTemplate.id}`,
           formData,
           {
@@ -108,15 +132,11 @@ export default function EmailTemplatePage() {
             },
           }
         );
-        setTemplates((prev) =>
-          prev.map((template) =>
-            template.id === currentTemplate.id
-              ? (response.data as EmailTemplate)
-              : template
-          )
-        );
+        
+        // Refresh templates after update
+        fetchTemplates(pageIndex, pageSize, debouncedSearchQuery);
       } else {
-        const response = await axios.post(
+        await axios.post(
           "http://localhost:3001/email-templates",
           formData,
           {
@@ -125,7 +145,9 @@ export default function EmailTemplatePage() {
             },
           }
         );
-        setTemplates((prev) => [...prev, response.data as EmailTemplate]);
+        
+        // Refresh templates after create
+        fetchTemplates(pageIndex, pageSize, debouncedSearchQuery);
       }
       setIsPopupOpen(false);
     } catch (error: any) {
@@ -143,7 +165,9 @@ export default function EmailTemplatePage() {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         });
-        setTemplates((prev) => prev.filter((template) => template.id !== id));
+        
+        // Refresh templates after delete
+        fetchTemplates(pageIndex, pageSize, debouncedSearchQuery);
       } catch (error) {
         console.error("Lỗi khi xóa template:", error);
         alert("Không thể xóa template.");
@@ -151,24 +175,38 @@ export default function EmailTemplatePage() {
     }
   };
 
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    // Reset to first page when searching
+    setPageIndex(0);
+  };
+
   const table = useReactTable({
     data: templates,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onGlobalFilterChange: setGlobalFilter,
-    globalFilterFn: "includesString",
-    state: {
-      globalFilter,
+    manualPagination: true,
+    pageCount: totalPages,
+    onPaginationChange: (updater) => {
+      if (typeof updater === 'function') {
+        const newPagination = updater({
+          pageIndex,
+          pageSize,
+        });
+        setPageIndex(newPagination.pageIndex);
+        setPageSize(newPagination.pageSize);
+      } else {
+        setPageIndex(updater.pageIndex);
+        setPageSize(updater.pageSize);
+      }
     },
-    initialState: {
+    state: {
       pagination: {
-        pageSize: 10,
+        pageIndex,
+        pageSize,
       },
     },
-    columnResizeMode: "onChange",
     meta: {
       handleEditTemplate,
       handleDeleteTemplate,
@@ -183,8 +221,8 @@ export default function EmailTemplatePage() {
         <Button onClick={handleCreateTemplate}>Tạo template mới</Button>
         <Input
           placeholder="Tìm kiếm theo tên, tiêu đề, hoặc nội dung..."
-          value={globalFilter ?? ""}
-          onChange={(event) => setGlobalFilter(event.target.value)}
+          value={searchQuery}
+          onChange={handleSearchChange}
           className="max-w-sm"
         />
       </div>
@@ -211,14 +249,23 @@ export default function EmailTemplatePage() {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  Đang tải...
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
                       style={{ width: cell.column.getSize() }}
-                      className="align-top" // Đảm bảo nội dung căn lên trên
+                      className="align-top" 
                     >
                       {flexRender(
                         cell.column.columnDef.cell,
@@ -248,7 +295,7 @@ export default function EmailTemplatePage() {
             variant="outline"
             size="sm"
             onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
+            disabled={!table.getCanPreviousPage() || isLoading}
           >
             Trang trước
           </Button>
@@ -256,7 +303,7 @@ export default function EmailTemplatePage() {
             variant="outline"
             size="sm"
             onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
+            disabled={!table.getCanNextPage() || isLoading}
           >
             Trang sau
           </Button>
@@ -265,23 +312,24 @@ export default function EmailTemplatePage() {
           <span>
             Trang{" "}
             <strong>
-              {table.getState().pagination.pageIndex + 1} /{" "}
-              {table.getPageCount()}
-            </strong>
+              {pageIndex + 1} / {Math.max(1, totalPages)}
+            </strong>{" "}
+            ({totalItems} kết quả)
           </span>
           <Select
-            value={table.getState().pagination.pageSize.toString()}
+            value={pageSize.toString()}
             onValueChange={(value) => {
               table.setPageSize(Number(value));
             }}
+            disabled={isLoading}
           >
             <SelectTrigger className="w-[100px]">
               <SelectValue placeholder="Chọn số hàng" />
             </SelectTrigger>
             <SelectContent>
-              {[5, 10, 20, 30, 50].map((pageSize) => (
-                <SelectItem key={pageSize} value={pageSize.toString()}>
-                  {pageSize} hàng
+              {[5, 10, 20, 30, 50].map((size) => (
+                <SelectItem key={size} value={size.toString()}>
+                  {size} hàng
                 </SelectItem>
               ))}
             </SelectContent>

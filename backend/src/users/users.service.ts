@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { UserDto } from './dto/user.dto';
+import { PaginatedResponseDto } from './dto/pagination.dto';
 
 @Injectable()
 export class UsersService {
@@ -24,6 +25,49 @@ export class UsersService {
       })),
     );
     return users.map((user) => this.toUserDto(user));
+  }
+
+  async findAllPaginated(
+    page = 1,
+    limit = 10,
+    search?: string,
+  ): Promise<PaginatedResponseDto<UserDto>> {
+    const skip = (page - 1) * limit;
+
+    let queryBuilder = this.usersRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.role', 'role')
+      .leftJoinAndSelect('user.studentCards', 'studentCards')
+      .leftJoinAndSelect('user.emailTemplates', 'emailTemplates')
+      .leftJoinAndSelect('user.transactions', 'transactions');
+
+    // Add search functionality
+    if (search) {
+      queryBuilder = queryBuilder.where(
+        '(user.email ILIKE :search OR user.description ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    const [users, totalItems] = await queryBuilder
+      .orderBy('user.id', 'DESC')
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    const totalPages = Math.ceil(totalItems / limit);
+    const data = users.map((user) => this.toUserDto(user));
+
+    return {
+      data,
+      meta: {
+        totalItems,
+        itemCount: data.length,
+        itemsPerPage: limit,
+        totalPages,
+        currentPage: page,
+      },
+    };
   }
 
   async findOne(id: number): Promise<UserDto> {

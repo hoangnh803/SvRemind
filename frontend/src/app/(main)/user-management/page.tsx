@@ -10,10 +10,7 @@ import {
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
-  getPaginationRowModel,
-  getFilteredRowModel,
   useReactTable,
-  ColumnFiltersState,
 } from "@tanstack/react-table";
 import {
   Table,
@@ -33,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { columns } from "./columns";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface User {
   id: number;
@@ -40,6 +38,17 @@ interface User {
   role: { name: string };
   createdDate: string;
   latestData: string | null;
+}
+
+interface PaginatedUsersResponse {
+  data: User[];
+  meta: {
+    totalItems: number;
+    itemCount: number;
+    itemsPerPage: number;
+    totalPages: number;
+    currentPage: number;
+  };
 }
 
 export default function UsersPage() {
@@ -51,11 +60,17 @@ export default function UsersPage() {
     email: string;
     newRole: string;
   }>({ show: false, message: "", email: "", newRole: "" });
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [token, setToken] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>({});
   const [currentEmail, setCurrentEmail] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [isDataLoading, setIsDataLoading] = useState(false);
 
   const router = useRouter();
 
@@ -79,22 +94,34 @@ export default function UsersPage() {
     }
   }, [router]);
 
+  const fetchUsers = async (page: number, size: number, query = "") => {
+    setIsDataLoading(true);
+    try {
+      const response = await axios.get<PaginatedUsersResponse>(
+        `http://localhost:3001/users/paginated?page=${page + 1}&limit=${size}${
+          query ? `&search=${encodeURIComponent(query)}` : ""
+        }`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      
+      setUsers(response.data.data);
+      setTotalPages(response.data.meta.totalPages);
+      setTotalItems(response.data.meta.totalItems);
+    } catch (err) {
+      setError("Lỗi khi lấy danh sách người dùng");
+    } finally {
+      setIsDataLoading(false);
+    }
+  };
+
   useEffect(() => {
     // Only fetch users when we have token and the user is admin
     if (!token || currentUser.role !== "Admin" || isLoading) return;
 
-    const fetchUsers = async () => {
-      try {
-        const response = await axios.get("http://localhost:3001/auth/users", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setUsers(response.data as User[]);
-      } catch (err) {
-        setError("Lỗi khi lấy danh sách người dùng");
-      }
-    };
-    fetchUsers();
-  }, [token, currentUser.role, isLoading]);
+    fetchUsers(pageIndex, pageSize, debouncedSearchQuery);
+  }, [token, currentUser.role, isLoading, pageIndex, pageSize, debouncedSearchQuery]);
 
   const handleUpdateRole = async (email: string, newRole: string) => {
     try {
@@ -103,11 +130,9 @@ export default function UsersPage() {
         { role: newRole },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setUsers(
-        users.map((u) =>
-          u.email === email ? { ...u, role: { name: newRole } } : u
-        )
-      );
+      
+      // Refresh users after update
+      fetchUsers(pageIndex, pageSize, debouncedSearchQuery);
     } catch (err) {
       setError("Lỗi khi cập nhật role");
     }
@@ -127,20 +152,36 @@ export default function UsersPage() {
     setConfirmPopup({ show: false, message: "", email: "", newRole: "" });
   };
 
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    // Reset to first page when searching
+    setPageIndex(0);
+  };
+
   const table = useReactTable({
     data: users,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onColumnFiltersChange: setColumnFilters,
-    state: {
-      columnFilters,
+    manualPagination: true,
+    pageCount: totalPages,
+    onPaginationChange: (updater) => {
+      if (typeof updater === 'function') {
+        const newPagination = updater({
+          pageIndex,
+          pageSize,
+        });
+        setPageIndex(newPagination.pageIndex);
+        setPageSize(newPagination.pageSize);
+      } else {
+        setPageIndex(updater.pageIndex);
+        setPageSize(updater.pageSize);
+      }
     },
-    initialState: {
+    state: {
       pagination: {
-        pageSize: 10,
+        pageIndex,
+        pageSize,
       },
     },
     meta: {
@@ -177,16 +218,12 @@ export default function UsersPage() {
         <div className="bg-red-100 text-red-700 p-2 mb-4 rounded">{error}</div>
       )}
 
-      {/* Ô nhập để lọc theo email */}
+      {/* Ô nhập để tìm kiếm */}
       <div className="mb-4">
         <Input
-          placeholder="Lọc theo email..."
-          value={
-            (table.getColumn("email")?.getFilterValue() as string) ?? ""
-          }
-          onChange={(event) =>
-            table.getColumn("email")?.setFilterValue(event.target.value)
-          }
+          placeholder="Tìm kiếm theo email hoặc mô tả..."
+          value={searchQuery}
+          onChange={handleSearchChange}
           className="max-w-sm"
         />
       </div>
@@ -210,7 +247,13 @@ export default function UsersPage() {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isDataLoading ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  Đang tải...
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map((cell) => (
@@ -241,7 +284,7 @@ export default function UsersPage() {
             variant="outline"
             size="sm"
             onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
+            disabled={!table.getCanPreviousPage() || isDataLoading}
           >
             Trang trước
           </Button>
@@ -249,7 +292,7 @@ export default function UsersPage() {
             variant="outline"
             size="sm"
             onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
+            disabled={!table.getCanNextPage() || isDataLoading}
           >
             Trang sau
           </Button>
@@ -258,23 +301,24 @@ export default function UsersPage() {
           <span>
             Trang{" "}
             <strong>
-              {table.getState().pagination.pageIndex + 1} /{" "}
-              {table.getPageCount()}
-            </strong>
+              {pageIndex + 1} / {Math.max(1, totalPages)}
+            </strong>{" "}
+            ({totalItems} kết quả)
           </span>
           <Select
-            value={table.getState().pagination.pageSize.toString()}
+            value={pageSize.toString()}
             onValueChange={(value) => {
               table.setPageSize(Number(value));
             }}
+            disabled={isDataLoading}
           >
             <SelectTrigger className="w-[100px]">
               <SelectValue placeholder="Chọn số hàng" />
             </SelectTrigger>
             <SelectContent>
-              {[5, 10, 20, 30, 50].map((pageSize) => (
-                <SelectItem key={pageSize} value={pageSize.toString()}>
-                  {pageSize} hàng
+              {[5, 10, 20, 30, 50].map((size) => (
+                <SelectItem key={size} value={size.toString()}>
+                  {size} hàng
                 </SelectItem>
               ))}
             </SelectContent>
