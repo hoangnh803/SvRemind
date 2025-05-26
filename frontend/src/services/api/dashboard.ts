@@ -6,12 +6,19 @@ export interface ChartDataPoint {
 }
 
 export interface DashboardData {
-  system?: {
+  system: {
     users: ChartDataPoint[];
     emails: ChartDataPoint[];
     studentCards: ChartDataPoint[];
   };
-  personal?: {
+  personal: {
+    myEmails: ChartDataPoint[];
+    myStudentCards: ChartDataPoint[];
+  };
+}
+
+export interface UserDashboardData {
+  personal: {
     myEmails: ChartDataPoint[];
     myStudentCards: ChartDataPoint[];
   };
@@ -41,7 +48,7 @@ export const dashboardService = {
     };
   },
 
-  getUserDashboardData: async (timeRange: string): Promise<DashboardData> => {
+  getUserDashboardData: async (timeRange: string): Promise<UserDashboardData> => {
     const [emailsResponse, studentCardsResponse] = await Promise.all([
       api.get<ChartDataPoint[]>('/dashboard/user/emails', { params: { timeRange } }),
       api.get<ChartDataPoint[]>('/dashboard/user/student-cards', { params: { timeRange } }),

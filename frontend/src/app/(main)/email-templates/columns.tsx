@@ -11,13 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-interface EmailTemplate {
-  id: string;
-  name: string;
-  title: string;
-  body: string;
-}
+import { EmailTemplate } from "@/services/api/emailTemplate";
 
 export const columns: ColumnDef<EmailTemplate>[] = [
   {

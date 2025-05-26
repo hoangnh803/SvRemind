@@ -18,9 +18,34 @@ export interface Transaction {
   };
 }
 
+export interface PaginatedTransactionsResponse {
+  data: Transaction[];
+  meta: {
+    totalItems: number;
+    itemCount: number;
+    itemsPerPage: number;
+    totalPages: number;
+    currentPage: number;
+  };
+}
+
 export const transactionService = {
   getTransactions: async (): Promise<Transaction[]> => {
     const response = await api.get<Transaction[]>('/transactions');
+    return response.data;
+  },
+
+  getTransactionsPaginated: async (page: number = 1, limit: number = 10, search: string = ''): Promise<PaginatedTransactionsResponse> => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (search) {
+      params.append('search', search);
+    }
+    
+    const response = await api.get<PaginatedTransactionsResponse>(`/transactions/paginated?${params.toString()}`);
     return response.data;
   },
 

@@ -1,27 +1,27 @@
 import api from './config';
 
-export interface Student {
-  mssv: string;
-  ten: string;
+export interface Recipient {
   email: string;
-  lop: string;
-  quanly: string;
+  ten: string;
+  mssv: string;
 }
 
-export interface SendEmailRequest {
-  recipients: {
-    email: string;
-    ten: string;
-    mssv: string;
-  }[];
+export interface SendEmailPayload {
+  recipients: Recipient[];
   subject: string;
   body: string;
-  emailTemplateId?: number;
+  emailTemplateId?: number | null;
+}
+
+export interface SendEmailResponse {
+  // Define based on actual API response, assuming a simple message for now
+  message: string;
 }
 
 export const emailService = {
-  sendEmail: async (data: SendEmailRequest): Promise<void> => {
-    await api.post('/send-email', data);
+  sendEmail: async (payload: SendEmailPayload): Promise<SendEmailResponse> => {
+    const response = await api.post<SendEmailResponse>('/send-email', payload);
+    return response.data;
   },
 
   getStudentData: async (barcode: string): Promise<Student> => {

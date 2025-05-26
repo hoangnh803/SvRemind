@@ -1,47 +1,22 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import axios from "axios";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-
-interface Transaction {
-  id: number;
-  sender: string;
-  receivers: string;
-  emailTemplateId: number | null;
-  title: string;
-  body: string;
-  plantDate: string | null;
-  sendDate: string | null;
-  createdBy: string;
-  emailTemplate?: {
-    id: number;
-    name: string;
-    title: string;
-    body: string;
-  };
-}
+import { transactionService, Transaction } from "@/services/api/transaction";
 
 export default function TransactionDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const [transaction, setTransaction] = useState<Transaction | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAllReceivers, setShowAllReceivers] = useState(false);
 
   useEffect(() => {
     const fetchTransaction = async () => {
       try {
-        const response = await axios.get<Transaction>(
-          `http://localhost:3001/transactions/${id}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          }
-        );
-        setTransaction(response.data);
+        const transaction = await transactionService.getTransaction(Number(id));
+        setTransaction(transaction);
       } catch (error) {
         console.error("Lỗi khi lấy chi tiết transaction:", error);
       } finally {
@@ -59,54 +34,79 @@ export default function TransactionDetailPage() {
     return <div className="p-6">Không tìm thấy transaction</div>;
   }
 
+  // Parse receivers to show only first one with count
+  const receiversArray = transaction.receivers.split(',').map(r => r.trim());
+  const firstReceiver = receiversArray[0];
+  const otherCount = receiversArray.length - 1;
+
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-4">
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Chi tiết Email Đã Gửi</h1>
-        <Button className="cursor-pointer" onClick={() => router.push("/transactions")}>
+        <Button onClick={() => router.push("/transactions")}>
           Quay lại danh sách
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Thông tin Transaction</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <strong>Danh sách người nhận:</strong>
-              <p>{transaction.receivers}</p>
-            </div>
-            <div>
-              <strong>Tiêu đề:</strong>
-              <p>{transaction.title}</p>
-            </div>
-            <div>
-              <strong>Tên template:</strong>
-              <p>{transaction.emailTemplate?.name ?? "Không có template"}</p>
-            </div>
-            <div>
-              <strong>Ngày gửi:</strong>
-              <p>
-                {transaction.sendDate
-                  ? new Date(transaction.sendDate).toLocaleString("vi-VN", {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                    })
-                  : "Chưa gửi"}
-              </p>
-            </div>
-            <div>
-              <strong>Nội dung email:</strong>
-              <div
-                className="prose max-w-none"
-                dangerouslySetInnerHTML={{ __html: transaction.body }}
-              />
-            </div>
+      <div className="space-y-4">
+        {/* Title and Template Section */}
+        <div className="border border-gray-300 p-4 bg-white">
+          <div className="text-lg font-semibold mb-2">{transaction.title}</div>
+          <div className="text-sm text-gray-600">
+            Template: {transaction.emailTemplate?.name || "Không có template"}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* Recipients Section */}
+        <div className="border border-gray-300 p-4 bg-white flex justify-between items-start">
+          <div className="flex-1">
+            <span className="font-medium">To: </span>
+            {showAllReceivers ? (
+              <div className="inline">
+                {receiversArray.map((receiver, index) => (
+                  <span key={index}>
+                    {receiver}
+                    {index < receiversArray.length - 1 && ', '}
+                  </span>
+                ))}
+                {otherCount > 0 && (
+                  <button
+                    onClick={() => setShowAllReceivers(false)}
+                    className="text-blue-600 hover:text-blue-800 ml-2 underline"
+                  >
+                    Thu gọn
+                  </button>
+                )}
+              </div>
+            ) : (
+              <span>
+                {firstReceiver}
+                {otherCount > 0 && (
+                  <button
+                    onClick={() => setShowAllReceivers(true)}
+                    className="text-blue-600 hover:text-blue-800 ml-2 underline"
+                  >
+                    +{otherCount} others
+                  </button>
+                )}
+              </span>
+            )}
+          </div>
+          <div className="text-sm text-gray-600 ml-4">
+            {transaction.sendDate
+              ? new Date(transaction.sendDate).toLocaleDateString("vi-VN")
+              : "Chưa gửi"}
+          </div>
+        </div>
+
+        {/* Content Section */}
+        <div className="border border-gray-300 p-6 bg-white min-h-[400px]">
+          <div
+            className="prose max-w-none"
+            dangerouslySetInnerHTML={{ __html: transaction.body }}
+          />
+        </div>
+      </div>
     </div>
   );
 }

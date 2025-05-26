@@ -16,6 +16,17 @@ export interface User {
   latestData: string | null;
 }
 
+export interface PaginatedUsersResponse {
+  data: User[];
+  meta: {
+    totalItems: number;
+    itemCount: number;
+    itemsPerPage: number;
+    totalPages: number;
+    currentPage: number;
+  };
+}
+
 export interface Role {
   id: number;
   name: string;
@@ -30,6 +41,20 @@ export const authService = {
 
   getUsers: async (): Promise<User[]> => {
     const response = await api.get<User[]>('/auth/users');
+    return response.data;
+  },
+
+  getUsersPaginated: async (page: number = 1, limit: number = 10, search: string = ''): Promise<PaginatedUsersResponse> => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString(),
+    });
+    
+    if (search) {
+      params.append('search', search);
+    }
+    
+    const response = await api.get<PaginatedUsersResponse>(`/users/paginated?${params.toString()}`);
     return response.data;
   },
 

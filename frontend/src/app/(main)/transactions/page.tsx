@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import axios from "axios";
 import {
   flexRender,
   getCoreRowModel,
@@ -31,35 +30,7 @@ import { useRouter } from "next/navigation";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useDebounce } from "@/hooks/useDebounce";
-
-interface Transaction {
-  id: number;
-  sender: string;
-  receivers: string;
-  emailTemplateId: number | null;
-  title: string;
-  body: string;
-  plantDate: string | null;
-  sendDate: string | null;
-  createdBy: string;
-  emailTemplate: {
-    id: number;
-    name: string;
-    title: string;
-    body: string;
-  };
-}
-
-interface PaginatedTransactionsResponse {
-  data: Transaction[];
-  meta: {
-    totalItems: number;
-    itemCount: number;
-    itemsPerPage: number;
-    totalPages: number;
-    currentPage: number;
-  };
-}
+import { transactionService, Transaction } from "@/services/api/transaction";
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -70,35 +41,20 @@ export default function TransactionsPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [isLoading, setIsLoading] = useState(false);
-  const [token, setToken] = useState<string | null>(null);
   const router = useRouter();
 
-  // Get token from localStorage on client side only
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setToken(localStorage.getItem("token"));
-    }
-  }, []);
-
   const fetchTransactions = async (page: number, size: number, query = "") => {
-    if (!token) return; // Don't fetch if token isn't loaded yet
-    
     setIsLoading(true);
     try {
-      const response = await axios.get<PaginatedTransactionsResponse>(
-        `http://localhost:3001/transactions/paginated?page=${page + 1}&limit=${size}${
-          query ? `&search=${encodeURIComponent(query)}` : ""
-        }`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+      const response = await transactionService.getTransactionsPaginated(
+        page + 1,
+        size,
+        query
       );
       
-      setTransactions(response.data.data);
-      setTotalPages(response.data.meta.totalPages);
-      setTotalItems(response.data.meta.totalItems);
+      setTransactions(response.data);
+      setTotalPages(response.meta.totalPages);
+      setTotalItems(response.meta.totalItems);
     } catch (error) {
       console.error("Lỗi khi lấy danh sách transaction:", error);
       toast.error("Không thể tải danh sách transaction");
@@ -108,23 +64,16 @@ export default function TransactionsPage() {
   };
 
   useEffect(() => {
-    if (!token) return; // Don't fetch if token isn't loaded yet
-
     fetchTransactions(pageIndex, pageSize, debouncedSearchQuery);
-  }, [token, pageIndex, pageSize, debouncedSearchQuery]);
+  }, [pageIndex, pageSize, debouncedSearchQuery]);
 
   const handleDeleteTransaction = async (id: number) => {
-    if (!token) return;
     if (!confirm("Bạn có chắc chắn muốn xóa transaction này?")) {
       return;
     }
 
     try {
-      await axios.delete(`http://localhost:3001/transactions/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await transactionService.deleteTransaction(id);
       
       // Refresh transactions after delete
       fetchTransactions(pageIndex, pageSize, debouncedSearchQuery);

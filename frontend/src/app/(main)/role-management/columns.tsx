@@ -4,12 +4,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown } from "lucide-react";
-
-interface Role {
-  id: number;
-  name: string;
-  description: string;
-}
+import { Role } from "@/services/api/auth";
 
 export const columns: ColumnDef<Role>[] = [
   {

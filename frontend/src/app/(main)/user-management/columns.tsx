@@ -11,14 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ArrowUpDown, MoreHorizontal } from "lucide-react";
-
-interface User {
-  id: number;
-  email: string;
-  role: { name: string };
-  createdDate: string;
-  latestData: string | null;
-}
+import { User } from "@/services/api/auth";
 
 export const columns: ColumnDef<User>[] = [
   {

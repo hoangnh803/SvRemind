@@ -50,6 +50,7 @@ export class EmailService {
    * @param recipients - Danh sách người nhận email
    * @param subject - Tiêu đề email
    * @param bodyTemplate - Nội dung email (hỗ trợ biến như {ten}, {hoVaTen}, {mssv}, {email})
+   * @param senderEmail - Email của người gửi (dùng làm chữ ký)
    * @returns {Promise<void>} - Không trả về giá trị
    * @throws {Error} - Nếu gửi email thất bại
    */
@@ -57,6 +58,7 @@ export class EmailService {
     recipients: { email: string; ten: string; mssv: string }[],
     subject: string,
     bodyTemplate: string,
+    senderEmail?: string,
   ): Promise<void> {
     const sender = this.configService.get<string>('MAIL_USER');
 
@@ -64,11 +66,17 @@ export class EmailService {
       const personalizedBody = this.replaceVariables(bodyTemplate, student);
       const personalizedSubject = this.replaceVariables(subject, student);
 
+      // Thêm chữ ký email nếu có senderEmail
+      let finalBody = personalizedBody;
+      if (senderEmail) {
+        finalBody += `<br><br><hr><p>Email người gửi: ${senderEmail}</p>`;
+      }
+
       const mailOptions = {
         from: sender,
         to: student.email,
         subject: personalizedSubject,
-        html: personalizedBody,
+        html: finalBody,
       };
 
       await this.transporter.sendMail(mailOptions);

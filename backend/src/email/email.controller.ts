@@ -48,10 +48,11 @@ export class EmailController {
   @ApiResponse({ status: 401, description: 'Chưa xác thực' })
   async sendEmail(@Request() req, @Body() sendEmailDto: SendEmailDto) {
     const createdBy = req.user.email || 'unknown';
+    const senderEmail = req.user.email; // Lấy email từ JWT token để làm chữ ký
     const { recipients, subject, body, emailTemplateId } = sendEmailDto;
 
-    // Gửi email
-    await this.emailService.sendEmail(recipients, subject, body);
+    // Gửi email với chữ ký
+    await this.emailService.sendEmail(recipients, subject, body, senderEmail);
 
     // Lưu transaction
     const transactionData = {

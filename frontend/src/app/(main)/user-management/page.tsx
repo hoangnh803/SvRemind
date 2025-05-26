@@ -5,7 +5,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
 import {
   flexRender,
   getCoreRowModel,
@@ -31,25 +30,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { columns } from "./columns";
 import { useDebounce } from "@/hooks/useDebounce";
-
-interface User {
-  id: number;
-  email: string;
-  role: { name: string };
-  createdDate: string;
-  latestData: string | null;
-}
-
-interface PaginatedUsersResponse {
-  data: User[];
-  meta: {
-    totalItems: number;
-    itemCount: number;
-    itemsPerPage: number;
-    totalPages: number;
-    currentPage: number;
-  };
-}
+import { authService, User } from "@/services/api/auth";
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -60,7 +41,6 @@ export default function UsersPage() {
     email: string;
     newRole: string;
   }>({ show: false, message: "", email: "", newRole: "" });
-  const [token, setToken] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>({});
   const [currentEmail, setCurrentEmail] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
@@ -77,10 +57,8 @@ export default function UsersPage() {
   // Get auth data from localStorage only on client side
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const storedToken = localStorage.getItem("token");
       const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
       
-      setToken(storedToken);
       setCurrentUser(storedUser);
       setCurrentEmail(storedUser.email || "");
       
@@ -97,18 +75,11 @@ export default function UsersPage() {
   const fetchUsers = async (page: number, size: number, query = "") => {
     setIsDataLoading(true);
     try {
-      const response = await axios.get<PaginatedUsersResponse>(
-        `http://localhost:3001/users/paginated?page=${page + 1}&limit=${size}${
-          query ? `&search=${encodeURIComponent(query)}` : ""
-        }`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await authService.getUsersPaginated(page + 1, size, query);
       
-      setUsers(response.data.data);
-      setTotalPages(response.data.meta.totalPages);
-      setTotalItems(response.data.meta.totalItems);
+      setUsers(response.data);
+      setTotalPages(response.meta.totalPages);
+      setTotalItems(response.meta.totalItems);
     } catch (err) {
       setError("Lỗi khi lấy danh sách người dùng");
     } finally {
@@ -117,19 +88,15 @@ export default function UsersPage() {
   };
 
   useEffect(() => {
-    // Only fetch users when we have token and the user is admin
-    if (!token || currentUser.role !== "Admin" || isLoading) return;
+    // Only fetch users when the user is admin
+    if (currentUser.role !== "Admin" || isLoading) return;
 
     fetchUsers(pageIndex, pageSize, debouncedSearchQuery);
-  }, [token, currentUser.role, isLoading, pageIndex, pageSize, debouncedSearchQuery]);
+  }, [currentUser.role, isLoading, pageIndex, pageSize, debouncedSearchQuery]);
 
   const handleUpdateRole = async (email: string, newRole: string) => {
     try {
-      await axios.put(
-        `http://localhost:3001/auth/users/${email}/role`,
-        { role: newRole },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await authService.updateUserRole(email, newRole);
       
       // Refresh users after update
       fetchUsers(pageIndex, pageSize, debouncedSearchQuery);

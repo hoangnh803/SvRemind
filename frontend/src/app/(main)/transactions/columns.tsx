@@ -4,24 +4,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, Trash2 } from "lucide-react";
-
-interface Transaction {
-  id: number;
-  sender: string;
-  receivers: string;
-  emailTemplateId: number;
-  title: string;
-  body: string;
-  plantDate: string | null;
-  sendDate: string | null;
-  createdBy: string;
-  emailTemplate: {
-    id: number;
-    name: string;
-    title: string;
-    body: string;
-  };
-}
+import { Transaction } from "@/services/api/transaction";
 
 export const columns: ColumnDef<Transaction, any>[] = [
   {

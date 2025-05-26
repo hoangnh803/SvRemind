@@ -4,7 +4,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import axios from "axios";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -38,20 +37,9 @@ import { columns } from "./columns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import QrMobileScannerDesktop from "@/components/qr-mobile-scanner/QrMobileScannerDesktop";
 
-interface Student {
-  mssv: string;
-  ten: string;
-  email: string;
-  lop: string;
-  quanly: string;
-}
-
-interface EmailTemplate {
-  id: string;
-  name: string;
-  title: string;
-  body: string;
-}
+import { studentService, Student, StudentCardPayload } from "@/services/api/student";
+import { emailTemplateService, EmailTemplate } from "@/services/api/emailTemplate";
+import { emailService, Recipient, SendEmailPayload } from "@/services/api/email";
 
 export default function SendEmailPage() {
   const [recipients, setRecipients] = useState<Student[]>([]);
@@ -73,15 +61,11 @@ export default function SendEmailPage() {
 
   const fetchTemplates = async () => {
     try {
-      const response = await axios.get<EmailTemplate[]>(
-        "http://localhost:3001/email-templates/all",
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
-      );
-      setTemplates(response.data);
+      const data = await emailTemplateService.getAllTemplates();
+      setTemplates(data);
     } catch (error) {
       console.error("Lỗi khi lấy danh sách template:", error);
+      toast.error("Không thể tải danh sách template.");
     }
   };
 
@@ -125,10 +109,7 @@ export default function SendEmailPage() {
     let studentData: Student | null = null;
 
     try {
-      // 1. Fetch student data from the external API
-      const apiUrl = `http://localhost:3001/proxy/student?barcode=${encodeURIComponent(url)}`;
-      const proxyResponse = await axios.get(apiUrl);
-      studentData = proxyResponse.data as Student;
+      studentData = await studentService.getStudentDataByBarcode(url);
 
       if (!studentData || !studentData.mssv) {
         toast.error("Không thể lấy thông tin sinh viên từ mã QR/URL.");
@@ -136,14 +117,12 @@ export default function SendEmailPage() {
         return null;
       }
 
-      // 2. Add to UI lists if not already processed in this session for UI
       if (processedMssvSet.current.has(studentData.mssv)) {
         toast.info(`Sinh viên ${studentData.ten} đã được thêm vào danh sách người nhận trong phiên này.`);
-        // Update recentlyAdded display even if already in set, to show it again
         setRecentlyAddedStudents((prev) => [studentData!, ...prev.filter(s => s.mssv !== studentData!.mssv).slice(0, 4)]);
         setCurrentSlide(0);
         setIsProcessing(false);
-        return studentData; // Return studentData so it can be potentially used by caller
+        return studentData;
       } else {
         setRecipients((prev) => [...prev, studentData!]);
         setRecentlyAddedStudents((prev) => [studentData!, ...prev.filter(s => s.mssv !== studentData!.mssv).slice(0, 4)]);
@@ -152,24 +131,14 @@ export default function SendEmailPage() {
         toast.success(`Đã thêm ${studentData.ten} vào danh sách người nhận.`);
       }
 
-      // 3. Attempt to save to StudentCard database (best effort, backend handles uniqueness)
       try {
-        const studentCardData = {
+        const studentCardPayload: StudentCardPayload = {
           fullNameNS: studentData.ten,
           studentCode: studentData.mssv,
           email: studentData.email,
-          cardCode: url, // Original scanned URL/barcode
+          cardCode: url,
         };
-        await axios.post(
-          "http://localhost:3001/student-cards",
-          studentCardData,
-          {
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-          }
-        );
-        // Optional: Toast for successful save or update, if backend provides such info.
-        // For now, the primary success toast is for adding to the list.
-        // toast.info(`Thông tin SV ${studentData.ten} đã được lưu/cập nhật vào CSDL của bạn.`);
+        await studentService.saveStudentCard(studentCardPayload);
       } catch (dbError: any) {
         if (dbError.response?.status === 409) {
           toast.info(`Thông tin SV ${studentData.ten} đã tồn tại trong CSDL của bạn.`);
@@ -178,9 +147,7 @@ export default function SendEmailPage() {
           toast.warn(`Lưu ý: Không thể lưu thông tin SV ${studentData.ten} vào CSDL dài hạn của bạn, nhưng vẫn có thể gửi email lần này.`);
         }
       }
-
       return studentData;
-
     } catch (error) {
       console.error("Lỗi khi lấy thông tin sinh viên từ proxy:", error);
       toast.error("Không thể lấy thông tin sinh viên từ mã QR/URL đã quét.");
@@ -189,7 +156,7 @@ export default function SendEmailPage() {
       setIsProcessing(false);
     }
   };
-
+  
   const handleManualAdd = async () => {
     if (!manualUrl.trim()) {
       toast.warn("Vui lòng nhập ít nhất một URL barcode.");
@@ -232,14 +199,26 @@ export default function SendEmailPage() {
   };
 
   useEffect(() => {
+    let scannerPromise: Promise<Html5QrcodeScanner | undefined> | undefined;
     if (isScanning && inputMethod === "camera") {
-      const scanner = startQrScanner();
+      scannerPromise = startQrScanner();
       return () => {
-        scanner.then((resolvedScanner) => resolvedScanner?.clear());
+        if (scannerPromise) {
+          scannerPromise.then((resolvedScanner) => {
+            if (resolvedScanner && typeof resolvedScanner.clear === 'function') {
+              resolvedScanner.clear().catch(err => console.error("Error clearing scanner:", err));
+            }
+          }).catch(err => console.error("Error resolving scanner promise for cleanup:", err));
+        }
+        if (scannerRef.current && typeof scannerRef.current.clear === 'function') {
+          scannerRef.current.clear().catch(err => console.error("Error clearing scannerRef.current:", err));
+        }
         scannerRef.current = null;
       };
     } else {
-      scannerRef.current?.clear();
+      if (scannerRef.current && typeof scannerRef.current.clear === 'function') {
+        scannerRef.current.clear().catch(err => console.error("Error clearing scannerRef.current on method change:", err));
+      }
       scannerRef.current = null;
       setIsScanning(false);
       if (inputMethod !== "scanner") {
@@ -289,28 +268,17 @@ export default function SendEmailPage() {
     }
 
     try {
+      const templatePayload = {
+        name: emailForm.name,
+        title: emailForm.title,
+        body: emailForm.body,
+      };
       if (selectedTemplate) {
-        await axios.put(
-          `http://localhost:3001/email-templates/${selectedTemplate}`,
-          emailForm,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          }
-        );
+        await emailTemplateService.updateTemplate(selectedTemplate, templatePayload);
         toast.success("Đã cập nhật template thành công!");
       } else {
-        const response = await axios.post<{ id: string }>(
-          "http://localhost:3001/email-templates",
-          emailForm,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          }
-        );
-        setSelectedTemplate(String(response.data.id));
+        const response = await emailTemplateService.createTemplate(templatePayload);
+        setSelectedTemplate(String(response.id));
         toast.success("Đã lưu template mới thành công!");
       }
       await fetchTemplates();
@@ -331,28 +299,17 @@ export default function SendEmailPage() {
     }
 
     try {
-      console.log("Gửi email với thông tin:", {
-        recipients,
+      const emailPayload: SendEmailPayload = {
+        recipients: recipients.map((student) => ({
+          email: student.email,
+          ten: student.ten,
+          mssv: student.mssv,
+        })),
         subject: emailForm.title,
         body: emailForm.body,
         emailTemplateId: selectedTemplate ? parseInt(selectedTemplate) : null,
-      });
-      const response = await axios.post(
-        "http://localhost:3001/send-email",
-        {
-          recipients: recipients.map((student) => ({
-            email: student.email,
-            ten: student.ten,
-            mssv: student.mssv,
-          })),
-          subject: emailForm.title,
-          body: emailForm.body,
-          emailTemplateId: selectedTemplate ? parseInt(selectedTemplate) : null,
-        },
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
-      );
+      };
+      await emailService.sendEmail(emailPayload);
       toast.success("Email đã được gửi thành công!");
       setRecipients([]);
       processedMssvSet.current.clear();
@@ -502,7 +459,7 @@ export default function SendEmailPage() {
               ) : (
                 <>
                   <p className="text-gray-600 mb-4">Đang chờ dữ liệu từ máy quét...</p>
-                  <Button
+                  {/* <Button
                     variant="destructive"
                     onClick={() => {
                       setIsScannerActive(false);
@@ -510,7 +467,7 @@ export default function SendEmailPage() {
                     }}
                   >
                     Dừng quét
-                  </Button>
+                  </Button> */}
                 </>
               )}
             </div>

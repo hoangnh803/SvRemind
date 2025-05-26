@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import axios from "axios";
 import { Editor } from "@tinymce/tinymce-react";
 import {
   flexRender,
@@ -29,24 +28,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { columns } from "./columns";
 import { useDebounce } from "@/hooks/useDebounce";
-
-interface EmailTemplate {
-  id: string;
-  name: string;
-  title: string;
-  body: string;
-}
-
-interface PaginatedResponse {
-  data: EmailTemplate[];
-  meta: {
-    totalItems: number;
-    itemCount: number;
-    itemsPerPage: number;
-    totalPages: number;
-    currentPage: number;
-  };
-}
+import { emailTemplateService, EmailTemplate } from "@/services/api/emailTemplate";
 
 export default function EmailTemplatePage() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
@@ -66,20 +48,11 @@ export default function EmailTemplatePage() {
   const fetchTemplates = async (page: number, size: number, query = "") => {
     setIsLoading(true);
     try {
-      const response = await axios.get<PaginatedResponse>(
-        `http://localhost:3001/email-templates?page=${page + 1}&limit=${size}${
-          query ? `&search=${encodeURIComponent(query)}` : ""
-        }`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
+      const response = await emailTemplateService.getTemplates(page + 1, size, query);
       
-      setTemplates(response.data.data);
-      setTotalPages(response.data.meta.totalPages);
-      setTotalItems(response.data.meta.totalItems);
+      setTemplates(response.data);
+      setTotalPages(response.meta.totalPages);
+      setTotalItems(response.meta.totalItems);
     } catch (error) {
       console.error("Lỗi khi lấy danh sách template:", error);
     } finally {
@@ -123,28 +96,12 @@ export default function EmailTemplatePage() {
     }
     try {
       if (currentTemplate) {
-        await axios.put(
-          `http://localhost:3001/email-templates/${currentTemplate.id}`,
-          formData,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          }
-        );
+        await emailTemplateService.updateTemplate(currentTemplate.id, formData);
         
         // Refresh templates after update
         fetchTemplates(pageIndex, pageSize, debouncedSearchQuery);
       } else {
-        await axios.post(
-          "http://localhost:3001/email-templates",
-          formData,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          }
-        );
+        await emailTemplateService.createTemplate(formData);
         
         // Refresh templates after create
         fetchTemplates(pageIndex, pageSize, debouncedSearchQuery);
@@ -160,11 +117,7 @@ export default function EmailTemplatePage() {
     console.log(id);
     if (confirm("Bạn có chắc chắn muốn xóa template này?")) {
       try {
-        await axios.delete(`http://localhost:3001/email-templates/${id}`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
+        await emailTemplateService.deleteTemplate(id);
         
         // Refresh templates after delete
         fetchTemplates(pageIndex, pageSize, debouncedSearchQuery);

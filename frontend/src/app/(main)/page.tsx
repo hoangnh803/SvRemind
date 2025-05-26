@@ -4,7 +4,6 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
-import axios from "axios";
 import {
   Card,
   CardContent,
@@ -26,11 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
-
-interface ChartDataPoint {
-  date: string;
-  count: number | string;
-}
+import { dashboardService, ChartDataPoint } from "@/services/api/dashboard";
 
 interface DashboardData {
   emails: ChartDataPoint[];
@@ -86,26 +81,17 @@ export default function UserDashboard() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-          throw new Error("No authentication token found");
-        }
-        const headers = { Authorization: `Bearer ${token}` };
-
         const processData = (rawData: any[]): ChartDataPoint[] =>
           rawData.map((item) => ({
             date: item.date,
             count: Number(item.count),
           })).filter((item) => !isNaN(item.count));
 
-        const [emailsResponse, studentCardsResponse] = await Promise.all([
-          axios.get<ChartDataPoint[]>("http://localhost:3001/dashboard/user/emails", { headers, params: { timeRange } }),
-          axios.get<ChartDataPoint[]>("http://localhost:3001/dashboard/user/student-cards", { headers, params: { timeRange } }),
-        ]);
+        const dashboardData = await dashboardService.getUserDashboardData(timeRange);
 
         const newData = {
-          emails: processData(emailsResponse.data),
-          studentCards: processData(studentCardsResponse.data),
+          emails: processData(dashboardData.personal.myEmails),
+          studentCards: processData(dashboardData.personal.myStudentCards),
         };
 
         console.log("Processed user dashboard data:", newData);

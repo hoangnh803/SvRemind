@@ -4,15 +4,8 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown } from "lucide-react";
-
-interface Student {
-  mssv: string;
-  ten: string;
-  email: string;
-  lop: string;
-  quanly: string;
-}
+import { ArrowUpDown, Trash2 } from "lucide-react";
+import { Student } from "@/services/api/student";
 
 export const columns: ColumnDef<Student>[] = [
   {

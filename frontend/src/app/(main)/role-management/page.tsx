@@ -4,7 +4,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
 import {
   flexRender,
   getCoreRowModel,
@@ -31,12 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { columns } from "./columns";
-
-interface Role {
-  id: number;
-  name: string;
-  description: string;
-}
+import { authService, Role } from "@/services/api/auth";
 
 export default function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([]);
@@ -61,10 +55,8 @@ export default function RolesPage() {
 
       const fetchRoles = async () => {
         try {
-          const response = await axios.get("http://localhost:3001/auth/roles", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          setRoles(response.data as Role[]);
+          const roles = await authService.getRoles();
+          setRoles(roles);
         } catch (err) {
           setError("Lỗi khi lấy danh sách quyền");
         }
