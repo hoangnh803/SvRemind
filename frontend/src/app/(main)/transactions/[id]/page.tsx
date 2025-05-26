@@ -36,8 +36,9 @@ export default function TransactionDetailPage() {
 
   // Parse receivers to show only first one with count
   const receiversArray = transaction.receivers.split(',').map(r => r.trim());
-  const firstReceiver = receiversArray[0];
-  const otherCount = receiversArray.length - 1;
+  const initialReceiversToShow = 3;
+  const visibleReceivers = receiversArray.slice(0, initialReceiversToShow);
+  const remainingCount = receiversArray.length - initialReceiversToShow;
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -69,7 +70,7 @@ export default function TransactionDetailPage() {
                     {index < receiversArray.length - 1 && ', '}
                   </span>
                 ))}
-                {otherCount > 0 && (
+                {remainingCount > 0 && (
                   <button
                     onClick={() => setShowAllReceivers(false)}
                     className="text-blue-600 hover:text-blue-800 ml-2 underline"
@@ -80,13 +81,13 @@ export default function TransactionDetailPage() {
               </div>
             ) : (
               <span>
-                {firstReceiver}
-                {otherCount > 0 && (
+                {visibleReceivers.join(', ')}
+                {remainingCount > 0 && (
                   <button
                     onClick={() => setShowAllReceivers(true)}
                     className="text-blue-600 hover:text-blue-800 ml-2 underline"
                   >
-                    +{otherCount} others
+                    +{remainingCount} others
                   </button>
                 )}
               </span>
