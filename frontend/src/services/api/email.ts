@@ -1,5 +1,12 @@
 import api from './config';
 
+export interface Student {
+  fullNameNS: string;
+  studentCode: string;
+  email: string;
+  cardCode: string;
+}
+
 export interface Recipient {
   email: string;
   ten: string;
