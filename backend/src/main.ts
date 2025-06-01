@@ -17,7 +17,7 @@ async function bootstrap() {
 
   // Configure main HTTP CORS
   app.enableCors({
-    origin: 'https://svremind.vercel.app', // Your frontend origin
+    origin: 'https://sv-remind.vercel.app', // Your frontend origin
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
@@ -36,13 +36,9 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document);
-  await app.listen(
-    process.env.PORT ?? 3000,
-    process.env.INTERFACE_NETWORK ?? 'localhost',
-  );
+  SwaggerModule.setup('api', app, document);
+  await app.listen(3001);
   console.log(`Application is running on: ${await app.getUrl()}`);
   console.log(`WebSocket server should be available via the same port.`);
 }
-
 bootstrap();
