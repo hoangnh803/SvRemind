@@ -15,7 +15,8 @@ const MobileScanContent = () => {
   const socketRef = useRef<SocketIOClient.Socket | null>(null);
 
   // Ensure this matches your backend WebSocket server URL
-  const backendWsUrl = process.env.NEXT_PUBLIC_BACKEND_WS_URL || 'ws://localhost:3001'; 
+  const backendApiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'https://api.lienlac.sinhvien.online';
+  const backendWsUrl = process.env.NEXT_PUBLIC_BACKEND_WS_URL || backendApiUrl;
 
   useEffect(() => {
     const id = searchParams.get('sessionId');

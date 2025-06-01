@@ -22,9 +22,9 @@ const QrMobileScannerDesktop: React.FC<QrMobileScannerDesktopProps> = ({ onStude
   const socketRef = useRef<SocketIOClient.Socket | null>(null);
 
   // Ensure this matches your backend API URL
-  const backendApiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'api.lienlac.sinhvien.online';
-  // Ensure this matches your backend WebSocket server URL
-  const backendWsUrl = process.env.NEXT_PUBLIC_BACKEND_WS_URL || 'ws://api.lienlac.sinhvien.online';
+  const backendApiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'https://api.lienlac.sinhvien.online';
+  // Socket.IO will automatically use the same base URL as the API, with proper protocol
+  const backendWsUrl = process.env.NEXT_PUBLIC_BACKEND_WS_URL || backendApiUrl;
 
   const initializeSession = async () => {
     setIsLoading(true);
