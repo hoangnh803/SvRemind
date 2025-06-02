@@ -36,8 +36,11 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
-  await app.listen(3001);
+  SwaggerModule.setup('docs', app, document);
+  await app.listen(
+    process.env.PORT ?? 3000,
+    process.env.INTERFACE_NETWORK ?? 'localhost',
+  );
   console.log(`Application is running on: ${await app.getUrl()}`);
   console.log(`WebSocket server should be available via the same port.`);
 }
