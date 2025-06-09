@@ -26,7 +26,7 @@
     "frontend": "file:",
     "html5-qrcode": "^2.3.8",
     "jose": "^6.0.10",
-    "lucide-react": "^0.485.0",
+    "lucide-react": "^0.513.0",
     "next": "15.2.2",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
