@@ -15,14 +15,22 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { NavUser } from "@/components/nav-user";
+import {
+  LayoutDashboard,
+  Users,
+  Shield,
+  Mail,
+  FileText,
+  ArrowLeftRight,
+} from "lucide-react";
+
 const menuItems = [
-  { name: "Dashboard", href: "/" },
-  { name: "User Management", href: "/user-management", adminOnly: true },
-  { name: "Role Management", href: "/role-management", adminOnly: true },
-  { name: "Send email", href: "/send-email" },
-  { name: "Email Templates", href: "/email-templates" },
-  { name: "Transaction", href: "/transactions" },
-  { name: "About us", href: "/about" },
+  { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "User Management", href: "/user-management", adminOnly: true, icon: Users },
+  { name: "Role Management", href: "/role-management", adminOnly: true, icon: Shield },
+  { name: "Send email", href: "/send-email", icon: Mail },
+  { name: "Email Templates", href: "/email-templates", icon: FileText },
+  { name: "Transaction", href: "/transactions", icon: ArrowLeftRight },
 ];
 
 export default function SidebarComponent() {
@@ -64,8 +72,9 @@ export default function SidebarComponent() {
                     <SidebarMenuButton asChild>
                       <Link
                         href={item.href}
-                        className="flex items-center w-full h-full"
+                        className="flex items-center w-full h-full gap-2"
                       >
+                        <item.icon className="w-5 h-5" />
                         <span>{item.name}</span>
                       </Link>
                     </SidebarMenuButton>

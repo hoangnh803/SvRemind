@@ -4,7 +4,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { Editor } from "@tinymce/tinymce-react";
@@ -79,7 +79,14 @@ export default function SendEmailPage() {
       stream.getTracks().forEach((track) => track.stop());
       const scanner = new Html5QrcodeScanner(
         "qr-reader",
-        { fps: 10, showZoomSliderIfSupported: true, defaultZoomValueIfSupported: 4 },
+        { 
+          fps: 2,
+          showZoomSliderIfSupported: true,
+          defaultZoomValueIfSupported: 4,
+          qrbox: { width: 350, height: 350 },
+          aspectRatio: 1.0,
+          formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
+        },
         false
       );
       scanner.render(onScanSuccess, onScanFailure);
@@ -92,11 +99,29 @@ export default function SendEmailPage() {
   };
 
   const onScanSuccess = (decodedText: string) => {
+    if (isProcessing) return;
+    
+    if (!decodedText || !decodedText.includes('hust.edu.vn')) {
+      toast.warn("Mã QR không hợp lệ. Vui lòng quét lại.");
+      return;
+    }
+
+    if (scannerRef.current) {
+      scannerRef.current.pause();
+      setTimeout(() => {
+        if (scannerRef.current) {
+          scannerRef.current.resume();
+        }
+      }, 2000);
+    }
+
     fetchStudentData(decodedText, true);
   };
 
   const onScanFailure = (error: any) => {
-    console.warn(`Lỗi quét mã QR: ${error}`);
+    if (error && error !== "QR code not found") {
+      console.warn(`Lỗi quét mã QR: ${error}`);
+    }
   };
 
   const fetchStudentData = async (
@@ -514,10 +539,11 @@ export default function SendEmailPage() {
                     <img
                       src={`https://api.toolhub.app/hust/AnhDaiDien?mssv=${recentlyAddedStudents[currentSlide].mssv}`}
                       alt="Ảnh thẻ"
-                      className="w-48 rounded border mx-auto"
-                      onError={(e) =>
-                        (e.currentTarget.src = "/placeholder.png")
-                      }
+                      className="w-48 object-cover rounded border mx-auto"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null; // Prevent infinite loop
+                        e.currentTarget.src = "https://provost.unm.edu/assets/img/placeholder-profile-4x6.jpg";
+                      }}
                     />
                     <p>
                       <strong>Tên:</strong>{" "}
