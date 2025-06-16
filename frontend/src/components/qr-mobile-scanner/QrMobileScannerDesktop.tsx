@@ -15,7 +15,7 @@ const QrMobileScannerDesktop: React.FC<QrMobileScannerDesktopProps> = ({ onStude
   const [mobileScanUrl, setMobileScanUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [scannedStudentData, setScannedStudentData] = useState<string | null>(null);
+  // const [scannedStudentData, setScannedStudentData] = useState<string | null>(null);
   const [socketStatus, setSocketStatus] = useState<string>('Chưa kết nối');
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
   const socketRef = useRef<SocketIOClient.Socket | null>(null);
@@ -71,7 +71,7 @@ const QrMobileScannerDesktop: React.FC<QrMobileScannerDesktopProps> = ({ onStude
   const initializeSession = async () => {
     setIsLoading(true);
     setError(null);
-    setScannedStudentData(null);
+    // setScannedStudentData(null);
     setSessionId(null);
     setMobileScanUrl(null);
 
@@ -128,7 +128,7 @@ const QrMobileScannerDesktop: React.FC<QrMobileScannerDesktopProps> = ({ onStude
 
       socketRef.current.on('studentQrData', (data: string) => {
         console.log('Received student QR data from mobile:', data);
-        setScannedStudentData(data);
+        // setScannedStudentData(data);
         setSocketStatus('Đã nhận dữ liệu sinh viên! Đang xử lý...');
         if (onStudentDataScanned) {
           onStudentDataScanned(data);
@@ -257,7 +257,7 @@ const QrMobileScannerDesktop: React.FC<QrMobileScannerDesktopProps> = ({ onStude
           
           <hr style={{margin: '20px 0', borderColor: '#dee2e6'}}/>
           
-          <h3 style={{ color: '#495057', marginBottom: '15px' }}>2. Dữ liệu sinh viên đã quét:</h3>
+          {/* <h3 style={{ color: '#495057', marginBottom: '15px' }}>2. Dữ liệu sinh viên đã quét:</h3>
           {scannedStudentData ? (
             <div style={{
               padding: '15px', 
@@ -284,7 +284,7 @@ const QrMobileScannerDesktop: React.FC<QrMobileScannerDesktopProps> = ({ onStude
             }}>
               Đang chờ dữ liệu QR sinh viên từ điện thoại... (Component desktop sẽ chuyển dữ liệu đến trang Gửi Email)
             </div>
-          )}
+          )} */}
         </div>
       )}
       

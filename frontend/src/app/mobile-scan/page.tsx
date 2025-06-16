@@ -181,6 +181,16 @@ const MobileScanContent = () => {
 
         const onScanSuccess = (decodedText: string, _result: Html5QrcodeResult) => {
             console.log(`Scan result: ${decodedText}`);
+            
+            // Validate QR code format
+            if (!decodedText || !decodedText.includes('hust.edu.vn')) {
+                setStatusMessage('Mã QR không hợp lệ. Vui lòng quét lại.');
+                setTimeout(() => {
+                    if (isScannerActive) setStatusMessage('Sẵn sàng quét mã QR tiếp theo.');
+                }, 2000);
+                return;
+            }
+
             setScanResult(decodedText);
             setStatusMessage(`Đã quét: ${decodedText}. Đang gửi đến máy tính...`);
             setIsScannerActive(false); // Stop further scans until this one is processed
@@ -198,17 +208,24 @@ const MobileScanContent = () => {
                     setStatusMessage('Lỗi: Thiếu thông tin phiên làm việc.');
                 }
             }
-            // To clear the scanner after a successful scan:
+
+            // Clear the scanner after a successful scan
             if (html5QrcodeScanner) {
-              html5QrcodeScanner.clear().catch(err => console.error('Failed to clear scanner', err));
+                html5QrcodeScanner.clear().catch(err => console.error('Failed to clear scanner', err));
             }
-            // To re-enable scanning for another QR code after a short delay:
-            setTimeout(() => setIsScannerActive(true), 3000); 
+
+            // Re-enable scanning after a delay
+            setTimeout(() => {
+                setIsScannerActive(true);
+                setStatusMessage('Sẵn sàng quét mã QR tiếp theo.');
+            }, 2000);
         };
 
         const onScanFailure = (_error: string) => {
-            // console.warn(`QR scan error: ${_error}`);
             // Don't update status too frequently on scan failures, can be annoying
+            if (_error && _error !== "QR code not found") {
+                console.warn(`QR scan error: ${_error}`);
+            }
         };
 
         html5QrcodeScanner.render(onScanSuccess, onScanFailure);
