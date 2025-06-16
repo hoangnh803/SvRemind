@@ -15,6 +15,7 @@ const MobileScanContent = () => {
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
   const [connectionMessage, setConnectionMessage] = useState<string>('Chưa kết nối');
   const socketRef = useRef<SocketIOClient.Socket | null>(null);
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
   // Ensure this matches your backend WebSocket server URL
   const backendApiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'https://api.lienlac.sinhvien.online';
@@ -153,13 +154,16 @@ const MobileScanContent = () => {
     // Ensure the div for the QR scanner exists in your JSX
     const scannerRegionId = "html5qr-code-full-region";
 
-    // Check if a scanner instance already exists to prevent duplicates
-    // html5-qrcode doesn't have a direct way to check for an active instance other than by its effects
-    // or by managing state carefully.
-    let html5QrcodeScanner: Html5QrcodeScanner | null = null;
+    // Clean up any existing scanner before creating a new one
+    if (scannerRef.current) {
+      scannerRef.current.clear().catch(err => {
+        console.error("Error clearing existing scanner:", err);
+      });
+      scannerRef.current = null;
+    }
 
     try {
-        html5QrcodeScanner = new Html5QrcodeScanner(
+        const html5QrcodeScanner = new Html5QrcodeScanner(
             scannerRegionId,
             {
                 fps: 10,
@@ -178,6 +182,8 @@ const MobileScanContent = () => {
             },
             /* verbose= */ false,
         );
+
+        scannerRef.current = html5QrcodeScanner;
 
         const onScanSuccess = (decodedText: string, _result: Html5QrcodeResult) => {
             console.log(`Scan result: ${decodedText}`);
@@ -225,13 +231,13 @@ const MobileScanContent = () => {
         setStatusMessage('Lỗi: Không thể khởi động máy quét QR. Vui lòng cấp quyền truy cập camera.');
         setIsScannerActive(false);
     }
-    
 
     return () => {
-        if (html5QrcodeScanner && html5QrcodeScanner.getState()) {
-            html5QrcodeScanner.clear().catch(err => {
+        if (scannerRef.current) {
+            scannerRef.current.clear().catch(err => {
                 console.error("Error cleaning up QR Code scanner: ", err);
             });
+            scannerRef.current = null;
         }
     };
 // eslint-disable-next-line react-hooks/exhaustive-deps
