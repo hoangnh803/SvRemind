@@ -185,15 +185,11 @@ const MobileScanContent = () => {
             // Validate QR code format
             if (!decodedText || !decodedText.includes('hust.edu.vn')) {
                 setStatusMessage('Mã QR không hợp lệ. Vui lòng quét lại.');
-                setTimeout(() => {
-                    if (isScannerActive) setStatusMessage('Sẵn sàng quét mã QR tiếp theo.');
-                }, 2000);
                 return;
             }
 
             setScanResult(decodedText);
             setStatusMessage(`Đã quét: ${decodedText}. Đang gửi đến máy tính...`);
-            setIsScannerActive(false); // Stop further scans until this one is processed
 
             if (socketRef.current && sessionId && connectionStatus === 'connected') {
                 socketRef.current.emit('sendStudentQrData', {
@@ -208,17 +204,6 @@ const MobileScanContent = () => {
                     setStatusMessage('Lỗi: Thiếu thông tin phiên làm việc.');
                 }
             }
-
-            // Clear the scanner after a successful scan
-            if (html5QrcodeScanner) {
-                html5QrcodeScanner.clear().catch(err => console.error('Failed to clear scanner', err));
-            }
-
-            // Re-enable scanning after a delay
-            setTimeout(() => {
-                setIsScannerActive(true);
-                setStatusMessage('Sẵn sàng quét mã QR tiếp theo.');
-            }, 2000);
         };
 
         const onScanFailure = (_error: string) => {
@@ -305,28 +290,6 @@ const MobileScanContent = () => {
           Trạng thái: {statusMessage}
         </p>
       </div>
-
-      {!isScannerActive && sessionId && connectionStatus === 'connected' && (
-        <button 
-          onClick={() => { 
-            setIsScannerActive(true); 
-            setStatusMessage('Đã kích hoạt lại máy quét. Sẵn sàng quét.');
-            setScanResult(null); // Clear previous scan result
-          }} 
-          style={{
-            padding: '12px 24px', 
-            marginTop: '15px',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '16px',
-            cursor: 'pointer'
-          }}
-        >
-          Quét Mã QR Khác
-        </button>
-      )}
 
       {connectionStatus === 'error' && (
         <button 
