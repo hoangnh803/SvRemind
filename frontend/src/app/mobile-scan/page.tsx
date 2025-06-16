@@ -2,7 +2,7 @@
 'use client';
 import { useEffect, useRef, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Html5QrcodeScanner, Html5QrcodeResult } from 'html5-qrcode';
+import { Html5QrcodeScanner, Html5QrcodeResult, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import * as SocketIOClient from 'socket.io-client';
 
 // Create a client component that uses useSearchParams
@@ -11,14 +11,16 @@ const MobileScanContent = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>('Initializing scanner...');
-  const [isScannerActive, setIsScannerActive] = useState<boolean>(true);
+  const [isScannerActive, setIsScannerActive] = useState<boolean>(false);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
   const [connectionMessage, setConnectionMessage] = useState<string>('Chưa kết nối');
   const socketRef = useRef<SocketIOClient.Socket | null>(null);
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const isInitializedRef = useRef<boolean>(false);
 
   // Ensure this matches your backend WebSocket server URL
   const backendApiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'https://api.lienlac.sinhvien.online';
+  // const backendApiUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:3001';
   const backendWsUrl = process.env.NEXT_PUBLIC_BACKEND_WS_URL || backendApiUrl;
 
   // Helper function to get connection status styling
@@ -61,6 +63,7 @@ const MobileScanContent = () => {
     }
   };
 
+  // Initialize WebSocket connection - chỉ chạy một lần khi component mount
   useEffect(() => {
     const id = searchParams.get('sessionId');
     if (id) {
@@ -124,7 +127,7 @@ const MobileScanContent = () => {
           console.log('Server confirmed data forwarded:', data);
           setStatusMessage(`Mã QR sinh viên đã được gửi thành công! Có thể quét tiếp.`);
           setTimeout(() => {
-            if (isScannerActive) setStatusMessage('Sẵn sàng quét mã QR tiếp theo.');
+            setStatusMessage('Sẵn sàng quét mã QR tiếp theo.');
           }, 3000);
         });
 
@@ -146,102 +149,90 @@ const MobileScanContent = () => {
         socketRef.current.disconnect();
       }
     };
-  }, [searchParams, backendWsUrl, isScannerActive, scanResult]);
+  }, []); // ✅ Dependency array rỗng - chỉ chạy một lần khi mount
 
+  // Handle QR Scanner initialization - chỉ phụ thuộc vào sessionId và isScannerActive
   useEffect(() => {
     if (!sessionId || !isScannerActive) return;
 
     // Ensure the div for the QR scanner exists in your JSX
     const scannerRegionId = "html5qr-code-full-region";
 
-    // Clean up any existing scanner before creating a new one
-    if (scannerRef.current) {
-      scannerRef.current.clear().catch(err => {
-        console.error("Error clearing existing scanner:", err);
-      });
-      scannerRef.current = null;
-    }
-
     try {
-        const html5QrcodeScanner = new Html5QrcodeScanner(
-            scannerRegionId,
-            {
-                fps: 10,
-                qrbox: (viewfinderWidth, viewfinderHeight) => {
-                    const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                    const qrboxSize = Math.floor(minEdge * 0.8);
-                    return {
-                        width: qrboxSize,
-                        height: qrboxSize,
-                    };
-                },
-                rememberLastUsedCamera: true,
-                supportedScanTypes: [], // Use default (camera)
-                showZoomSliderIfSupported: true,
-                defaultZoomValueIfSupported: 2
-            },
-            /* verbose= */ false,
-        );
+      // Clean up any existing scanner before creating a new one
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(err => {
+          console.error("Error clearing existing scanner:", err);
+        });
+        scannerRef.current = null;
+      }
 
-        scannerRef.current = html5QrcodeScanner;
+      const html5QrcodeScanner = new Html5QrcodeScanner(
+        scannerRegionId,
+        {
+          fps: 2,
+          showZoomSliderIfSupported: true,
+          defaultZoomValueIfSupported: 4,
+          qrbox: { width: 350, height: 350 },
+          aspectRatio: 1.0,
+          formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
+        },
+        false
+      );
 
-        const onScanSuccess = (decodedText: string, _result: Html5QrcodeResult) => {
-            console.log(`Scan result: ${decodedText}`);
-            
-            // Validate QR code format
-            if (!decodedText || !decodedText.includes('hust.edu.vn')) {
-                setStatusMessage('Mã QR không hợp lệ. Vui lòng quét lại.');
-                return;
-            }
+      scannerRef.current = html5QrcodeScanner;
 
-            setScanResult(decodedText);
-            setStatusMessage(`Đã quét: ${decodedText}. Đang gửi đến máy tính...`);
-
-            if (socketRef.current && sessionId && connectionStatus === 'connected') {
-                socketRef.current.emit('sendStudentQrData', {
-                    sessionId: sessionId,
-                    qrData: decodedText,
-                });
-                setStatusMessage('Đang gửi dữ liệu đến máy tính...');
-            } else {
-                if (connectionStatus !== 'connected') {
-                    setStatusMessage('Lỗi: Không có kết nối đến máy chủ. Vui lòng kiểm tra kết nối.');
-                } else {
-                    setStatusMessage('Lỗi: Thiếu thông tin phiên làm việc.');
-                }
-            }
-        };
-
-        const onScanFailure = (_error: string) => {
-            // Don't update status too frequently on scan failures, can be annoying
-            if (_error && _error !== "QR code not found") {
-                console.warn(`QR scan error: ${_error}`);
-            }
-        };
-
-        html5QrcodeScanner.render(onScanSuccess, onScanFailure);
-        if (connectionStatus === 'connected') {
-            setStatusMessage('Máy quét QR đã sẵn sàng. Hãy hướng camera về phía mã QR sinh viên.');
-        } else {
-            setStatusMessage('Máy quét đã khởi động nhưng chưa kết nối đến máy chủ.');
+      const onScanSuccess = (decodedText: string, _result: Html5QrcodeResult) => {
+        console.log(`Scan result: ${decodedText}`);
+        
+        // Validate QR code format
+        if (!decodedText || !decodedText.includes('hust.edu.vn')) {
+          setStatusMessage('Mã QR không hợp lệ. Vui lòng quét lại.');
+          return;
         }
 
+        setScanResult(decodedText);
+        setStatusMessage(`Đã quét: ${decodedText}. Đang gửi đến máy tính...`);
+
+        if (socketRef.current && sessionId && socketRef.current.connected) {
+          socketRef.current.emit('sendStudentQrData', {
+            sessionId: sessionId,
+            qrData: decodedText,
+          });
+          setStatusMessage('Đang gửi dữ liệu đến máy tính...');
+        } else {
+          if (!socketRef.current?.connected) {
+            setStatusMessage('Lỗi: Không có kết nối đến máy chủ. Vui lòng kiểm tra kết nối.');
+          } else {
+            setStatusMessage('Lỗi: Thiếu thông tin phiên làm việc.');
+          }
+        }
+      };
+
+      const onScanFailure = (_error: string) => {
+        // Don't update status too frequently on scan failures, can be annoying
+        if (_error && _error !== "QR code not found") {
+          console.warn(`QR scan error: ${_error}`);
+        }
+      };
+
+      html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+      setStatusMessage('Máy quét QR đã sẵn sàng. Hãy hướng camera về phía mã QR sinh viên.');
     } catch (error) {
-        console.error('Failed to initialize Html5QrcodeScanner', error);
-        setStatusMessage('Lỗi: Không thể khởi động máy quét QR. Vui lòng cấp quyền truy cập camera.');
-        setIsScannerActive(false);
+      console.error('Failed to initialize Html5QrcodeScanner', error);
+      setStatusMessage('Lỗi: Không thể khởi động máy quét QR. Vui lòng cấp quyền truy cập camera.');
+      setIsScannerActive(false);
     }
 
     return () => {
-        if (scannerRef.current) {
-            scannerRef.current.clear().catch(err => {
-                console.error("Error cleaning up QR Code scanner: ", err);
-            });
-            scannerRef.current = null;
-        }
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(err => {
+          console.error("Error cleaning up QR Code scanner: ", err);
+        });
+        scannerRef.current = null;
+      }
     };
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, [sessionId, isScannerActive, connectionStatus]); // Rerun when sessionId is available or scanner needs reactivation
+  }, [sessionId, isScannerActive]); // ✅ Loại bỏ connectionStatus khỏi dependency
 
   return (
     <div style={{ padding: '20px', textAlign: 'center', fontFamily: 'Arial, sans-serif' }}>
@@ -265,14 +256,50 @@ const MobileScanContent = () => {
         <p><strong>Session ID:</strong> {sessionId || 'Đang tải...'}</p>
       </div>
 
-      <div id="html5qr-code-full-region" style={{ 
-        width: '100%', 
-        maxWidth: '500px', 
-        margin: '20px auto',
-        border: connectionStatus === 'connected' ? '2px solid #00b894' : '2px solid #ddd',
-        borderRadius: '8px',
-        padding: '10px'
-      }}></div>
+      <div className="bg-white p-4 rounded shadow min-h-[320px] flex items-center justify-center">
+        {!isScannerActive ? (
+          <button
+            onClick={() => setIsScannerActive(true)}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#007bff',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              cursor: 'pointer'
+            }}
+          >
+            Bắt đầu quét QR bằng Camera
+          </button>
+        ) : (
+          <div className="w-full">
+            <div id="html5qr-code-full-region" style={{ 
+              width: '100%', 
+              maxWidth: '500px', 
+              margin: '20px auto',
+              border: connectionStatus === 'connected' ? '2px solid #00b894' : '2px solid #ddd',
+              borderRadius: '8px',
+              padding: '10px'
+            }}></div>
+            <button
+              onClick={() => setIsScannerActive(false)}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: '#dc3545',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '16px',
+                cursor: 'pointer',
+                marginTop: '10px'
+              }}
+            >
+              Dừng quét
+            </button>
+          </div>
+        )}
+      </div>
       
       {scanResult && (
         <div style={{
@@ -349,4 +376,4 @@ const MobileScanPage = () => {
   );
 };
 
-export default MobileScanPage; 
+export default MobileScanPage;
