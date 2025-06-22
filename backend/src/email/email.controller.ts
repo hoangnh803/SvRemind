@@ -47,7 +47,7 @@ export class EmailController {
   })
   @ApiResponse({ status: 401, description: 'Chưa xác thực' })
   async sendEmail(@Request() req, @Body() sendEmailDto: SendEmailDto) {
-    const createdBy = req.user.email || 'unknown';
+    const userEmail = req.user.email || 'unknown';
     const senderEmail = req.user.email; // Lấy email từ JWT token để làm chữ ký
     const { recipients, subject, body, emailTemplateId } = sendEmailDto;
 
@@ -62,11 +62,10 @@ export class EmailController {
       body,
       plantDate: undefined,
       sendDate: new Date(),
-      createdBy,
       title: subject, // Adding the missing 'title' property
     };
 
-    await this.transactionsService.create(transactionData);
+    await this.transactionsService.create(transactionData, userEmail);
 
     return { message: 'Email đã được gửi và giao dịch đã được lưu thành công' };
   }

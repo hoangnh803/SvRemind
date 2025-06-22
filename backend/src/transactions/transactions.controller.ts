@@ -7,11 +7,11 @@ import {
   Get,
   Param,
   Body,
-  Headers,
-  UnauthorizedException,
   NotFoundException,
   Delete,
   Query,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -19,41 +19,47 @@ import {
   ApiTags,
   ApiOperation,
   ApiBody,
-  ApiHeader,
   ApiResponse,
   ApiParam,
   ApiBadRequestResponse,
   ApiUnauthorizedResponse,
   ApiNotFoundResponse,
   ApiQuery,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { Transaction } from './entities/transaction.entity';
 import {
   PaginatedTransactionResponseDto,
   TransactionPaginationQueryDto,
 } from './dto/pagination.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+
+interface AuthenticatedRequest extends Request {
+  user: {
+    email: string;
+    id: number;
+    role: string;
+  };
+}
 
 /**
  * Controller xử lý các endpoint liên quan đến giao dịch email
  */
 @ApiTags('transactions')
 @Controller('transactions')
+@UseGuards(JwtAuthGuard)
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 
   /**
    * Tạo một giao dịch email mới
    * @param createTransactionDto - DTO chứa thông tin giao dịch
-   * @param authHeader - Token xác thực trong header
+   * @param req - Request chứa thông tin user từ JWT
    * @returns Giao dịch đã được tạo
    */
   @Post()
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Tạo giao dịch email mới' })
-  @ApiHeader({
-    name: 'authorization',
-    description: 'Bearer token để xác thực',
-    required: true,
-  })
   @ApiBody({ type: CreateTransactionDto })
   @ApiResponse({
     status: 201,
@@ -80,41 +86,47 @@ export class TransactionsController {
   @ApiBadRequestResponse({ description: 'Dữ liệu đầu vào không hợp lệ' })
   async create(
     @Body() createTransactionDto: CreateTransactionDto,
-    @Headers('authorization') authHeader: string,
+    @Request() req: AuthenticatedRequest,
   ) {
-    if (!authHeader) {
-      throw new UnauthorizedException('Token không hợp lệ');
-    }
-
-    const transaction =
-      await this.transactionsService.create(createTransactionDto);
+    const userEmail = req.user.email;
+    const transaction = await this.transactionsService.create(
+      createTransactionDto,
+      userEmail,
+    );
     return { message: 'Transaction đã được lưu thành công', transaction };
   }
 
   /**
-   * Lấy danh sách tất cả giao dịch
-   * @returns Danh sách giao dịch
+   * Lấy danh sách giao dịch của user hiện tại
+   * @param req - Request chứa thông tin user từ JWT
+   * @returns Danh sách giao dịch của user
    */
   @Get()
+  @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Lấy danh sách tất cả giao dịch (không phân trang)',
+    summary: 'Lấy danh sách giao dịch của user hiện tại (không phân trang)',
   })
   @ApiResponse({
     status: 200,
-    description: 'Danh sách giao dịch',
+    description: 'Danh sách giao dịch của user',
     type: [Transaction],
   })
-  findAll() {
-    return this.transactionsService.findAll();
+  @ApiUnauthorizedResponse({ description: 'Token không hợp lệ' })
+  findAll(@Request() req: AuthenticatedRequest) {
+    const userEmail = req.user.email;
+    return this.transactionsService.findAllByUser(userEmail);
   }
 
   /**
-   * Lấy danh sách giao dịch có phân trang và tìm kiếm
+   * Lấy danh sách giao dịch của user hiện tại có phân trang và tìm kiếm
+   * @param req - Request chứa thông tin user từ JWT
    * @returns Danh sách giao dịch có phân trang
    */
   @Get('paginated')
+  @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Lấy danh sách giao dịch có phân trang và tìm kiếm',
+    summary:
+      'Lấy danh sách giao dịch của user hiện tại có phân trang và tìm kiếm',
   })
   @ApiQuery({ type: TransactionPaginationQueryDto })
   @ApiResponse({
@@ -122,10 +134,14 @@ export class TransactionsController {
     description: 'Danh sách giao dịch có phân trang',
     type: PaginatedTransactionResponseDto,
   })
+  @ApiUnauthorizedResponse({ description: 'Token không hợp lệ' })
   async findAllPaginated(
     @Query() paginationQuery: TransactionPaginationQueryDto,
+    @Request() req: AuthenticatedRequest,
   ): Promise<PaginatedTransactionResponseDto> {
-    return await this.transactionsService.findAllPaginated(
+    const userEmail = req.user.email;
+    return await this.transactionsService.findAllPaginatedByUser(
+      userEmail,
       paginationQuery.page,
       paginationQuery.limit,
       paginationQuery.search,
@@ -133,41 +149,50 @@ export class TransactionsController {
   }
 
   /**
-   * Lấy chi tiết một giao dịch theo ID
+   * Lấy chi tiết một giao dịch theo ID (chỉ của user hiện tại)
    * @param id - ID của giao dịch
+   * @param req - Request chứa thông tin user từ JWT
    * @returns Chi tiết giao dịch
    */
   @Get(':id')
-  @ApiOperation({ summary: 'Lấy chi tiết giao dịch theo ID' })
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Lấy chi tiết giao dịch theo ID (chỉ của user hiện tại)',
+  })
   @ApiParam({ name: 'id', description: 'ID của giao dịch', example: '1' })
   @ApiResponse({
     status: 200,
     description: 'Chi tiết giao dịch',
     type: Transaction,
   })
-  @ApiNotFoundResponse({ description: 'Transaction không tồn tại' })
-  async findOne(@Param('id') id: string) {
-    const transaction = await this.transactionsService.findOne(+id);
+  @ApiNotFoundResponse({
+    description: 'Transaction không tồn tại hoặc không thuộc về user',
+  })
+  @ApiUnauthorizedResponse({ description: 'Token không hợp lệ' })
+  async findOne(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+    const userEmail = req.user.email;
+    const transaction = await this.transactionsService.findOneByUser(
+      +id,
+      userEmail,
+    );
     if (transaction === undefined || transaction === null) {
-      throw new NotFoundException('Transaction không tồn tại');
+      throw new NotFoundException(
+        'Transaction không tồn tại hoặc không thuộc về user',
+      );
     }
     return transaction;
   }
 
   /**
-   * Xóa một giao dịch theo ID
+   * Xóa một giao dịch theo ID (chỉ của user hiện tại)
    * @param id - ID của giao dịch
-   * @param authHeader - Token xác thực trong header
+   * @param req - Request chứa thông tin user từ JWT
    * @returns Thông báo xóa thành công
    */
   @Delete(':id')
-  @ApiOperation({ summary: 'Xóa giao dịch theo ID' })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Xóa giao dịch theo ID (chỉ của user hiện tại)' })
   @ApiParam({ name: 'id', description: 'ID của giao dịch', example: '1' })
-  @ApiHeader({
-    name: 'authorization',
-    description: 'Bearer token để xác thực',
-    required: true,
-  })
   @ApiResponse({
     status: 200,
     description: 'Giao dịch đã được xóa thành công',
@@ -176,17 +201,19 @@ export class TransactionsController {
     },
   })
   @ApiUnauthorizedResponse({ description: 'Token không hợp lệ' })
-  @ApiNotFoundResponse({ description: 'Transaction không tồn tại' })
-  async delete(
-    @Param('id') id: string,
-    @Headers('authorization') authHeader: string,
-  ) {
-    if (!authHeader) {
-      throw new UnauthorizedException('Token không hợp lệ');
-    }
-    const transaction = await this.transactionsService.findOne(+id);
+  @ApiNotFoundResponse({
+    description: 'Transaction không tồn tại hoặc không thuộc về user',
+  })
+  async delete(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+    const userEmail = req.user.email;
+    const transaction = await this.transactionsService.findOneByUser(
+      +id,
+      userEmail,
+    );
     if (!transaction) {
-      throw new NotFoundException('Transaction không tồn tại');
+      throw new NotFoundException(
+        'Transaction không tồn tại hoặc không thuộc về user',
+      );
     }
     await this.transactionsService.delete(+id);
     return { message: 'Transaction đã được xóa thành công' };

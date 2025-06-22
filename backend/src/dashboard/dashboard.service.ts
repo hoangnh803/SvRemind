@@ -89,13 +89,13 @@ export class DashboardService {
     return query.getRawMany();
   }
 
-  async getUserEmails(userId: number, timeRange: string | undefined) {
+  async getUserEmails(userEmail: string, timeRange: string | undefined) {
     const startDate = this.getDateFilter(timeRange);
     const query = this.transactionRepository
       .createQueryBuilder('transaction')
       .select("TO_CHAR(transaction.sendDate, 'YYYY-MM-DD')", 'date')
       .addSelect('COUNT(*)::integer', 'count')
-      .where('transaction.userId = :userId', { userId })
+      .where('transaction.createdBy = :userEmail', { userEmail })
       .groupBy("TO_CHAR(transaction.sendDate, 'YYYY-MM-DD')")
       .orderBy("TO_CHAR(transaction.sendDate, 'YYYY-MM-DD')");
 

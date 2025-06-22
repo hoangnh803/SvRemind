@@ -89,7 +89,7 @@ export class DashboardController {
     @Req() req,
     @Query() query: DashboardQueryDto,
   ): Promise<ChartDataPointDto[]> {
-    return this.dashboardService.getUserEmails(req.user.id, query.timeRange);
+    return this.dashboardService.getUserEmails(req.user.email, query.timeRange);
   }
 
   @UseGuards(JwtAuthGuard)

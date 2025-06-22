@@ -52,11 +52,4 @@ export class CreateTransactionDto {
     required: true,
   })
   sendDate: Date;
-
-  @ApiProperty({
-    description: 'Email của người tạo giao dịch',
-    example: 'admin@example.com',
-    required: true,
-  })
-  createdBy: string;
 }

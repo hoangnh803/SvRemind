@@ -23,14 +23,15 @@ export class TransactionsService {
 
   async create(
     createTransactionDto: CreateTransactionDto,
+    userEmail: string,
   ): Promise<Transaction> {
-    // Look up the user by createdBy email
+    // Look up the user by email
     const user = await this.usersRepository.findOne({
-      where: { email: createTransactionDto.createdBy },
+      where: { email: userEmail },
     });
     if (!user) {
       throw new NotFoundException(
-        `Không tìm thấy người dùng với email ${createTransactionDto.createdBy}`,
+        `Không tìm thấy người dùng với email ${userEmail}`,
       );
     }
 
@@ -53,6 +54,7 @@ export class TransactionsService {
       ...createTransactionDto,
       user,
       emailTemplate,
+      createdBy: userEmail, // Use the authenticated user's email
     });
 
     return this.transactionsRepository.save(transaction);
@@ -61,6 +63,14 @@ export class TransactionsService {
   async findAll(): Promise<Transaction[]> {
     return this.transactionsRepository.find({
       relations: ['emailTemplate', 'user'],
+    });
+  }
+
+  async findAllByUser(userEmail: string): Promise<Transaction[]> {
+    return this.transactionsRepository.find({
+      where: { createdBy: userEmail },
+      relations: ['emailTemplate', 'user'],
+      order: { id: 'DESC' },
     });
   }
 
@@ -104,9 +114,61 @@ export class TransactionsService {
     };
   }
 
+  async findAllPaginatedByUser(
+    userEmail: string,
+    page = 1,
+    limit = 10,
+    search?: string,
+  ): Promise<PaginatedResponseDto<Transaction>> {
+    const skip = (page - 1) * limit;
+
+    let queryBuilder = this.transactionsRepository
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.emailTemplate', 'emailTemplate')
+      .leftJoinAndSelect('transaction.user', 'user')
+      .where('transaction.createdBy = :userEmail', { userEmail });
+
+    // Add search functionality
+    if (search) {
+      queryBuilder = queryBuilder.andWhere(
+        '(transaction.title ILIKE :search OR transaction.body ILIKE :search OR transaction.sender ILIKE :search OR transaction.receivers ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    const [transactions, totalItems] = await queryBuilder
+      .orderBy('transaction.id', 'DESC')
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    const totalPages = Math.ceil(totalItems / limit);
+
+    return {
+      data: transactions,
+      meta: {
+        totalItems,
+        itemCount: transactions.length,
+        itemsPerPage: limit,
+        totalPages,
+        currentPage: page,
+      },
+    };
+  }
+
   async findOne(id: number): Promise<Transaction | null> {
     return this.transactionsRepository.findOne({
       where: { id },
+      relations: ['emailTemplate', 'user'],
+    });
+  }
+
+  async findOneByUser(
+    id: number,
+    userEmail: string,
+  ): Promise<Transaction | null> {
+    return this.transactionsRepository.findOne({
+      where: { id, createdBy: userEmail },
       relations: ['emailTemplate', 'user'],
     });
   }
